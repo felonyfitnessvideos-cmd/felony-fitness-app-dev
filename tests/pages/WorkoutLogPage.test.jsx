@@ -453,7 +453,7 @@ describe('WorkoutLogPage', () => {
 
             await waitFor(() => {
                 // Look for chart container or canvas element
-                const chartElement = screen.queryByRole('img', { name: /chart/i });
+                screen.queryByRole('img', { name: /chart/i });
                 // Chart rendering may vary, check component is rendered
                 expect(screen.getByText('Bench Press')).toBeInTheDocument();
             });

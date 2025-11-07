@@ -64,7 +64,7 @@ const mockSupabase = {
         )
     },
     functions: {
-        invoke: vi.fn((functionName, options) => {
+        invoke: vi.fn((functionName) => {
             if (functionName === 'generate-nutrition-recommendations') {
                 return Promise.resolve({
                     data: mockNutritionRecommendations,
@@ -427,6 +427,7 @@ describe('NutritionRecsPage', () => {
             const user = userEvent.setup();
             const recsWithoutIds = {
                 ...mockNutritionRecommendations,
+                // eslint-disable-next-line no-unused-vars
                 recommendations: mockNutritionRecommendations.recommendations.map(({ id, ...rest }) => rest)
             };
 

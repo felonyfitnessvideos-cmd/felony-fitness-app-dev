@@ -45,6 +45,8 @@ OldFiles/
 
 # Testing
 /coverage/
+**/coverage/
+tests/coverage/
 *.lcov
 test-results/
 playwright-report/

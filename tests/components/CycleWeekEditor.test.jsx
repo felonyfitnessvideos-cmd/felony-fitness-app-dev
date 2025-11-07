@@ -183,7 +183,7 @@ describe('CycleWeekEditor', () => {
     });
 
     describe('Initial Assignments', () => {
-        it('should use initialAssignments when length matches weeks * 7', () => {
+        it('should use initialAssignments when length matches weeks * 7', async () => {
             const initialAssignments = [
                 { week_index: 1, day_index: 1, type: 'routine', routine_id: 'routine-1' },
                 { week_index: 1, day_index: 2, type: 'rest', routine_id: null },
@@ -203,14 +203,14 @@ describe('CycleWeekEditor', () => {
             );
 
             // Should call onAssignmentsChange with the initial assignments
-            waitFor(() => {
+            await waitFor(() => {
                 expect(mockOnAssignmentsChange).toHaveBeenCalled();
                 const assignments = mockOnAssignmentsChange.mock.calls[0][0];
                 expect(assignments).toEqual(initialAssignments);
             });
         });
 
-        it('should generate defaults when initialAssignments length does not match', () => {
+        it('should generate defaults when initialAssignments length does not match', async () => {
             const initialAssignments = [
                 { week_index: 1, day_index: 1, type: 'routine', routine_id: 'routine-1' }
             ];
@@ -223,7 +223,7 @@ describe('CycleWeekEditor', () => {
                 />
             );
 
-            waitFor(() => {
+            await waitFor(() => {
                 expect(mockOnAssignmentsChange).toHaveBeenCalled();
                 const assignments = mockOnAssignmentsChange.mock.calls[0][0];
                 expect(assignments.length).toBe(14); // 2 weeks * 7 days

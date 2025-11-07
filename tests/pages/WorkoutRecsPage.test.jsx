@@ -73,7 +73,7 @@ const mockSupabase = {
         )
     },
     functions: {
-        invoke: vi.fn((functionName, options) => {
+        invoke: vi.fn((functionName) => {
             if (functionName === 'generate-workout-recommendations') {
                 return Promise.resolve({
                     data: mockRecommendations,
@@ -452,6 +452,7 @@ describe('WorkoutRecsPage', () => {
             const user = userEvent.setup();
             const recsWithoutIds = {
                 ...mockRecommendations,
+                // eslint-disable-next-line no-unused-vars
                 recommendations: mockRecommendations.recommendations.map(({ id, ...rest }) => rest)
             };
 
