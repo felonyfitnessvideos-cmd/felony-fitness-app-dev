@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChefHat, Plus, Save, Search, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Plus, Search, X, Save, ChefHat } from 'lucide-react';
 import './MealBuilder.css';
 
 /**
@@ -30,12 +30,12 @@ import './MealBuilder.css';
  *   categories={['breakfast', 'lunch', 'dinner', 'snack']}
  * />
  */
-const MealBuilder = ({ 
-  isOpen, 
-  onClose, 
-  onSave, 
+const MealBuilder = ({
+  isOpen,
+  onClose,
+  onSave,
   editingMeal = null,
-  categories = ['breakfast', 'lunch', 'dinner', 'snack'] 
+  categories = ['breakfast', 'lunch', 'dinner', 'snack']
 }) => {
   /** @type {[Object, Function]} State for meal metadata and details */
   const [mealData, setMealData] = useState({
@@ -46,22 +46,22 @@ const MealBuilder = ({
 
   /** @type {[Array, Function]} State for selected meal ingredients with quantities */
   const [mealFoods, setMealFoods] = useState([]);
-  
+
   /** @type {[string, Function]} State for food search query */
   const [foodSearch, setFoodSearch] = useState('');
-  
+
   /** @type {[Array, Function]} State for food search results from database */
   const [searchResults, setSearchResults] = useState([]);
-  
+
   /** @type {[boolean, Function]} State for food search loading indicator */
   const [isSearching, setIsSearching] = useState(false);
-  
+
   /** @type {React.MutableRefObject} Reference for search debounce timeout */
   const searchDebounceRef = useRef(null);
-  
+
   /** @type {React.MutableRefObject} Reference for search abort controller */
   const searchAbortControllerRef = useRef(null);
-  
+
   /** @type {[Object, Function]} State for calculated nutrition totals */
   const [nutrition, setNutrition] = useState({
     calories: 0,
@@ -69,7 +69,7 @@ const MealBuilder = ({
     carbs: 0,
     fat: 0
   });
-  
+
   /** @type {[boolean, Function]} State for meal save operation loading */
   const [isSaving, setIsSaving] = useState(false);
 
@@ -84,7 +84,7 @@ const MealBuilder = ({
         category: editingMeal.category || 'breakfast',
         tags: editingMeal.tags || []
       });
-      
+
       // Load existing meal foods if editing
       if (editingMeal.id) {
         loadMealFoods(editingMeal.id);
@@ -110,7 +110,7 @@ const MealBuilder = ({
     const totals = mealFoods.reduce((acc, item) => {
       const food = item.food_servings;
       const quantity = item.quantity || 0;
-      
+
       return {
         calories: acc.calories + (food.calories * quantity || 0),
         protein: acc.protein + (food.protein_g * quantity || 0),
@@ -181,7 +181,7 @@ const MealBuilder = ({
         .eq('meal_id', mealId);
 
       if (error) throw error;
-      
+
       setMealFoods(data.map(item => ({
         id: item.id,
         food_servings_id: item.food_servings_id,
@@ -224,7 +224,7 @@ const MealBuilder = ({
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
-    
+
     if (!searchTerm.trim()) {
       setSearchResults([]);
       setIsSearching(false);
@@ -240,18 +240,18 @@ const MealBuilder = ({
 
       setIsSearching(true);
       try {
-        const { data, error } = await supabase.functions.invoke('food-search', {
+        const { data, error } = await supabase.functions.invoke('food-search-v2', {
           body: { query: searchTerm },
           signal: controller.signal,
         });
-        
+
         if (error) throw error;
         if (controller.signal.aborted) return;
 
         let standardizedResults = [];
         if (data?.source === 'local') {
           // Database results - convert to consistent format
-          standardizedResults = (data.results || []).flatMap(food => 
+          standardizedResults = (data.results || []).flatMap(food =>
             (food.food_servings || []).map(serving => ({
               id: serving.id,
               food_name: food.name,
@@ -290,7 +290,7 @@ const MealBuilder = ({
             return result;
           });
         }
-        
+
         setSearchResults(standardizedResults);
       } catch (error) {
         if (error?.name === 'AbortError') {
@@ -316,14 +316,14 @@ const MealBuilder = ({
    */
   const addFoodToMeal = (food) => {
     const servingId = food.serving_id || food.id;
-    
+
     if (!servingId) {
       alert('Unable to add food - missing serving information');
       return;
     }
-    
+
     const existingIndex = mealFoods.findIndex(item => item.food_servings_id === servingId);
-    
+
     if (existingIndex >= 0) {
       // Increase quantity if food already exists
       const updated = [...mealFoods];
@@ -340,7 +340,7 @@ const MealBuilder = ({
         carbs_g: food.carbs_g || food.carbs || 0,
         fat_g: food.fat_g || food.fat || 0
       };
-      
+
       // Add new food
       const newMealFood = {
         id: null, // New item, no ID yet
@@ -351,7 +351,7 @@ const MealBuilder = ({
       };
       setMealFoods(prev => [...prev, newMealFood]);
     }
-    
+
     setFoodSearch('');
     setSearchResults([]);
   };
@@ -368,7 +368,7 @@ const MealBuilder = ({
       removeFoodFromMeal(index);
       return;
     }
-    
+
     const updated = [...mealFoods];
     updated[index].quantity = parseFloat(quantity) || 0;
     setMealFoods(updated);
@@ -468,10 +468,10 @@ const MealBuilder = ({
 
       // Process external foods first - save them to food_servings table to get real IDs
       const processedMealFoods = [];
-      
+
       for (const item of mealFoods) {
         let finalFoodServingsId = item.food_servings_id;
-        
+
         // Check if this is an external food (string ID starting with "ext_")
         if (typeof item.food_servings_id === 'string' && item.food_servings_id.startsWith('ext_')) {
           // Create food record first
@@ -483,9 +483,9 @@ const MealBuilder = ({
             }])
             .select()
             .single();
-          
+
           if (foodError) throw foodError;
-          
+
           // Create food_servings record
           const { data: servingData, error: servingError } = await supabase
             .from('food_servings')
@@ -499,12 +499,12 @@ const MealBuilder = ({
             }])
             .select()
             .single();
-          
+
           if (servingError) throw servingError;
-          
+
           finalFoodServingsId = servingData.id;
         }
-        
+
         processedMealFoods.push({
           meal_id: mealId,
           food_servings_id: finalFoodServingsId,
@@ -577,7 +577,7 @@ const MealBuilder = ({
                 <input
                   type="text"
                   value={mealData.name}
-                  onChange={(e) => setMealData({...mealData, name: e.target.value})}
+                  onChange={(e) => setMealData({ ...mealData, name: e.target.value })}
                   placeholder="Enter meal name"
                 />
               </div>
@@ -585,7 +585,7 @@ const MealBuilder = ({
                 <label>Category</label>
                 <select
                   value={mealData.category}
-                  onChange={(e) => setMealData({...mealData, category: e.target.value})}
+                  onChange={(e) => setMealData({ ...mealData, category: e.target.value })}
                 >
                   {categories.map(cat => (
                     <option key={cat} value={cat}>
@@ -600,7 +600,7 @@ const MealBuilder = ({
           {/* Food Search and List Section */}
           <div className="meal-foods-section">
             <h3>Foods</h3>
-            
+
             {/* Food Search */}
             <div className="food-search">
               <div className="search-input-container">
@@ -615,14 +615,14 @@ const MealBuilder = ({
                   }}
                 />
               </div>
-              
+
               {/* Search Results */}
               {isSearching && (
                 <div className="search-loading">
                   <div className="loading-spinner">Searching foods...</div>
                 </div>
               )}
-              
+
               {!isSearching && searchResults.length > 0 && (
                 <div className="search-results">
                   {searchResults.map((food, index) => (
@@ -660,15 +660,15 @@ const MealBuilder = ({
                     {/* Show serving description with food name */}
                     {(() => {
                       // Get food name from multiple possible sources
-                      const foodName = item.food_servings.foods?.name || 
-                                      item.food_servings.food_name || 
-                                      item.food_servings.name ||
-                                      'Unknown Food';
-                      
+                      const foodName = item.food_servings.foods?.name ||
+                        item.food_servings.food_name ||
+                        item.food_servings.name ||
+                        'Unknown Food';
+
                       // Handle foods without names silently
-                      
+
                       if (item.food_servings.serving_description) {
-                        return foodName !== 'Unknown Food' ? 
+                        return foodName !== 'Unknown Food' ?
                           `${item.food_servings.serving_description.replace(/^\d+(\.\d+)?\s*/, '')} ${foodName}` :
                           item.food_servings.serving_description;
                       } else {
@@ -684,7 +684,7 @@ const MealBuilder = ({
                   </button>
                 </div>
               ))}
-              
+
               {mealFoods.length === 0 && (
                 <div className="no-foods">
                   <p>No foods added yet. Search and add foods above.</p>
@@ -723,8 +723,8 @@ const MealBuilder = ({
           <button onClick={onClose} className="cancel-btn">
             Cancel
           </button>
-          <button 
-            onClick={handleSaveMeal} 
+          <button
+            onClick={handleSaveMeal}
             className="save-btn"
             disabled={isSaving || !mealData.name.trim() || mealFoods.length === 0}
           >

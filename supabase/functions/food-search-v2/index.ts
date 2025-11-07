@@ -12,21 +12,21 @@
  * 5. Quality Control: Multi-stage validation before database insertion
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 // GUARDRAIL CONFIGURATION
 const NUTRITIONAL_LIMITS = {
   calories: { min: 0, max: 2000 },     // Per serving
-  protein_g: { min: 0, max: 100 },    
-  carbs_g: { min: 0, max: 200 },      
+  protein_g: { min: 0, max: 100 },
+  carbs_g: { min: 0, max: 200 },
   fat_g: { min: 0, max: 100 }
 };
 
 const VALID_CATEGORIES = [
-  "Vegetables", "Fruits", "Meat & Poultry", "Seafood", 
+  "Vegetables", "Fruits", "Meat & Poultry", "Seafood",
   "Dairy & Eggs", "Grains, Bread & Pasta", "Protein & Supplements",
   "Beverages", "Breakfast & Cereals", "Desserts & Sweets"
 ];
@@ -44,7 +44,7 @@ const SERVING_PATTERNS = [
  */
 function cleanSearchQuery(query: string): string {
   const cleanQuery = query.toLowerCase().trim();
-  
+
   // Common serving size patterns to remove
   const servingPatterns = [
     // Fractions with units: "1/2 cup", "3/4 oz", etc.
@@ -58,22 +58,22 @@ function cleanSearchQuery(query: string): string {
     // Standalone serving words: "cooked", "raw", "diced", "chopped", etc.
     /\b(cooked|raw|fresh|frozen|diced|chopped|sliced|steamed|boiled|grilled|baked)\b/gi
   ];
-  
+
   let cleaned = cleanQuery;
-  
+
   // Remove serving patterns
   for (const pattern of servingPatterns) {
     cleaned = cleaned.replace(pattern, '');
   }
-  
+
   // Clean up extra spaces and trim
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
+
   // If we removed everything, return original query
   if (!cleaned || cleaned.length < 2) {
     return query.trim();
   }
-  
+
   return cleaned;
 }
 
@@ -82,7 +82,7 @@ function cleanSearchQuery(query: string): string {
  */
 function validateNutrition(nutrition: any): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   for (const [nutrient, limits] of Object.entries(NUTRITIONAL_LIMITS)) {
     const value = nutrition[nutrient];
     if (value !== null && value !== undefined) {
@@ -91,16 +91,16 @@ function validateNutrition(nutrition: any): { isValid: boolean; errors: string[]
       }
     }
   }
-  
+
   // Calorie consistency check (rough estimate: 4*carbs + 4*protein + 9*fat)
   const estimatedCalories = (nutrition.carbs_g || 0) * 4 + (nutrition.protein_g || 0) * 4 + (nutrition.fat_g || 0) * 9;
   const actualCalories = nutrition.calories || 0;
   const calorieDifference = Math.abs(estimatedCalories - actualCalories);
-  
+
   if (calorieDifference > actualCalories * 0.3) { // 30% tolerance
     errors.push(`Calorie inconsistency: estimated ${estimatedCalories}, provided ${actualCalories}`);
   }
-  
+
   return { isValid: errors.length === 0, errors };
 }
 
@@ -109,53 +109,53 @@ function validateNutrition(nutrition: any): { isValid: boolean; errors: string[]
  */
 function validateCategory(food: any): string {
   const foodName = food.name?.toLowerCase() || '';
-  
+
   // Category enforcement rules based on primary ingredient
-  if (foodName.includes('chicken') || foodName.includes('beef') || foodName.includes('pork') || 
-      foodName.includes('turkey') || foodName.includes('meat')) {
+  if (foodName.includes('chicken') || foodName.includes('beef') || foodName.includes('pork') ||
+    foodName.includes('turkey') || foodName.includes('meat')) {
     return "Meat & Poultry";
   }
-  
-  if (foodName.includes('fish') || foodName.includes('salmon') || foodName.includes('tuna') || 
-      foodName.includes('shrimp') || foodName.includes('crab')) {
+
+  if (foodName.includes('fish') || foodName.includes('salmon') || foodName.includes('tuna') ||
+    foodName.includes('shrimp') || foodName.includes('crab')) {
     return "Seafood";
   }
-  
-  if (foodName.includes('milk') || foodName.includes('cheese') || foodName.includes('yogurt') || 
-      foodName.includes('egg')) {
+
+  if (foodName.includes('milk') || foodName.includes('cheese') || foodName.includes('yogurt') ||
+    foodName.includes('egg')) {
     return "Dairy & Eggs";
   }
-  
-  if (foodName.includes('rice') || foodName.includes('bread') || foodName.includes('pasta') || 
-      foodName.includes('oats') || foodName.includes('cereal') || foodName.includes('chip')) {
+
+  if (foodName.includes('rice') || foodName.includes('bread') || foodName.includes('pasta') ||
+    foodName.includes('oats') || foodName.includes('cereal') || foodName.includes('chip')) {
     return "Grains, Bread & Pasta";
   }
-  
+
   if (foodName.includes('protein') || foodName.includes('whey') || foodName.includes('casein') ||
-      foodName.includes('supplement')) {
+    foodName.includes('supplement')) {
     return "Protein & Supplements";
   }
-  
-  if (foodName.includes('apple') || foodName.includes('banana') || foodName.includes('orange') || 
-      foodName.includes('berry') || foodName.includes('fruit')) {
+
+  if (foodName.includes('apple') || foodName.includes('banana') || foodName.includes('orange') ||
+    foodName.includes('berry') || foodName.includes('fruit')) {
     return "Fruits";
   }
-  
-  if (foodName.includes('broccoli') || foodName.includes('spinach') || foodName.includes('carrot') || 
-      foodName.includes('vegetable')) {
+
+  if (foodName.includes('broccoli') || foodName.includes('spinach') || foodName.includes('carrot') ||
+    foodName.includes('vegetable')) {
     return "Vegetables";
   }
-  
-  if (foodName.includes('coffee') || foodName.includes('tea') || foodName.includes('water') || 
-      foodName.includes('juice') || foodName.includes('soda')) {
+
+  if (foodName.includes('coffee') || foodName.includes('tea') || foodName.includes('water') ||
+    foodName.includes('juice') || foodName.includes('soda')) {
     return "Beverages";
   }
-  
-  if (foodName.includes('cake') || foodName.includes('cookie') || foodName.includes('ice cream') || 
-      foodName.includes('candy') || foodName.includes('chocolate')) {
+
+  if (foodName.includes('cake') || foodName.includes('cookie') || foodName.includes('ice cream') ||
+    foodName.includes('candy') || foodName.includes('chocolate')) {
     return "Desserts & Sweets";
   }
-  
+
   // Default fallback
   return "Grains, Bread & Pasta";
 }
@@ -211,12 +211,12 @@ async function findSimilarFoods(supabase: any, foodName: string) {
     .select('id, name, category')
     .or(`name.ilike.${foodName},name.ilike.${foodName.replace(/\s+/g, '%')}`)
     .limit(3);
-    
+
   // Only return if we find an exact match (case insensitive)
-  const exactMatches = (data || []).filter(food => 
+  const exactMatches = (data || []).filter(food =>
     food.name.toLowerCase() === foodName.toLowerCase()
   );
-    
+
   return exactMatches;
 }
 
@@ -229,7 +229,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { query } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+      console.log('Received request body:', JSON.stringify(body));
+    } catch (parseError) {
+      console.error('Failed to parse JSON body:', parseError);
+      throw new Error("Invalid JSON in request body");
+    }
+
+    const { query } = body;
+    console.log('Extracted query:', query);
+
     if (!query) {
       throw new Error("Search query is required.");
     }
@@ -242,30 +253,38 @@ Deno.serve(async (req) => {
     // Step 1: Clean the search query to extract food name from serving sizes
     const cleanedQuery = cleanSearchQuery(query);
     console.log(`Original query: "${query}" -> Cleaned: "${cleanedQuery}"`);
-    
+
     // Step 2: Enhanced local search with better relevance ranking
     const searchTerms = cleanedQuery.toLowerCase().split(' ');
     const primaryTerm = searchTerms[0];
     const fullQuery = cleanedQuery.toLowerCase();
-    
+
+    // CRITICAL FIX: food_servings table is denormalized - food_name is a text field, not a foreign key!
+    // Search food_servings directly (similar to exercise-search pattern)
+    console.log('Starting database search on food_servings...');
     const { data: allMatches, error: localError } = await supabaseAdmin
-      .from('foods')
-      .select('*, food_servings(*)')
-      .ilike('name', `%${cleanedQuery}%`)
+      .from('food_servings')
+      .select('*')
+      .ilike('food_name', `%${cleanedQuery}%`)
       .limit(20); // Get more results to rank them
 
-    if (localError) throw localError;
+    console.log('Database search complete:', { matchCount: allMatches?.length || 0, error: localError });
+
+    if (localError) {
+      console.error('Database error:', localError);
+      throw localError;
+    }
 
     // If cleaned query returns no results, try original query as fallback
     let searchResults = allMatches || [];
     if (searchResults.length === 0 && cleanedQuery !== query.toLowerCase()) {
       console.log('No results with cleaned query, trying original query as fallback...');
       const { data: fallbackMatches, error: fallbackError } = await supabaseAdmin
-        .from('foods')
-        .select('*, food_servings(*)')
-        .ilike('name', `%${query}%`)
+        .from('food_servings')
+        .select('*')
+        .ilike('food_name', `%${query}%`)
         .limit(20);
-      
+
       if (!fallbackError && fallbackMatches) {
         searchResults = fallbackMatches;
         console.log(`Fallback search found ${searchResults.length} results`);
@@ -275,30 +294,30 @@ Deno.serve(async (req) => {
     // Rank results by relevance
     const rankedResults = (searchResults || [])
       .map(food => {
-        const name = food.name.toLowerCase();
+        const name = (food.food_name || food.name || '').toLowerCase();
         let score = 0;
-        
+
         // Use cleanedQuery for scoring, but original query as backup
         const scoringQuery = searchResults === allMatches ? fullQuery : query.toLowerCase();
         const scoringTerms = searchResults === allMatches ? searchTerms : query.toLowerCase().split(' ');
-        
+
         // Exact match gets highest score
         if (name === scoringQuery) score += 100;
-        
+
         // Name starts with query gets high score
         if (name.startsWith(scoringQuery)) score += 50;
-        
+
         // Contains all search terms gets good score
         if (scoringTerms.every(term => name.includes(term))) score += 30;
-        
+
         // Contains primary term gets base score
         const primaryScoringTerm = scoringTerms[0];
         if (name.includes(primaryScoringTerm)) score += 10;
-        
+
         // Penalty for very different length (likely irrelevant)
         const lengthDiff = Math.abs(name.length - scoringQuery.length);
         if (lengthDiff > scoringQuery.length * 2) score -= 20;
-        
+
         return { ...food, relevanceScore: score };
       })
       .filter(food => food.relevanceScore > 0)
@@ -306,8 +325,8 @@ Deno.serve(async (req) => {
       .slice(0, 5);
 
     if (rankedResults.length > 0) {
-      return new Response(JSON.stringify({ 
-        results: rankedResults, 
+      return new Response(JSON.stringify({
+        results: rankedResults,
         source: 'local',
         quality_score: 'verified'
       }), {
@@ -316,23 +335,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Step 2: Check for similar foods to prevent duplicates
-    const similarFoods = await findSimilarFoods(supabaseAdmin, query);
-    if (similarFoods.length > 0) {
-      return new Response(JSON.stringify({
-        results: [],
-        source: 'duplicate_check',
-        message: `Similar foods found: ${similarFoods.map((f: any) => f.name).join(', ')}. Consider using existing entries.`,
-        similar_foods: similarFoods
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
+    // Step 3: Check for similar foods to prevent duplicates (optional - skip for now since no foods table relationship)
+    // TODO: Re-enable after schema consolidation
 
-    // Step 3: AI generation with enhanced guardrails
+    // Step 4: AI generation with enhanced guardrails
     const enhancedPrompt = createEnhancedPrompt(cleanedQuery);
-    
+
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -354,11 +362,11 @@ Deno.serve(async (req) => {
 
     const aiData = await aiResponse.json();
     const aiResults = JSON.parse(aiData.choices[0].message.content);
-    
+
     // Step 4: Comprehensive validation
     const validatedResults = [];
     const validationErrors = [];
-    
+
     for (const food of aiResults.results || []) {
       // Validate nutrition
       const nutritionCheck = validateNutrition(food);
@@ -366,18 +374,18 @@ Deno.serve(async (req) => {
         validationErrors.push(`${food.name}: ${nutritionCheck.errors.join(', ')}`);
         continue;
       }
-      
+
       // Validate category
       if (!VALID_CATEGORIES.includes(food.category)) {
         food.category = validateCategory(food);
       }
-      
+
       // Validate serving description
       if (!validateServingDescription(food.serving_description || '')) {
         validationErrors.push(`${food.name}: Invalid serving description format`);
         continue;
       }
-      
+
       validatedResults.push({
         ...food,
         quality_score: 'ai_validated'
@@ -395,7 +403,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: err instanceof Error ? err.message : 'Unknown error occurred',
       quality_score: 'error'
     }), {
