@@ -1,4 +1,4 @@
- 
+
 /**
  * @file EditRoutinePage.jsx
  * @description This page allows users to create a new workout routine or edit an existing one.
@@ -62,22 +62,22 @@ function EditRoutinePage() {
   const { routineId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [routineName, setRoutineName] = useState('');
   /** @type {[Exercise[], React.Dispatch<React.SetStateAction<Exercise[]>>]} */
   const [routineExercises, setRoutineExercises] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const searchAbortControllerRef = useRef(null);
   const searchDebounceRef = useRef(null);
-  
+
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [customExerciseName, setCustomExerciseName] = useState('');
   const [selectedMuscleGroupId, setSelectedMuscleGroupId] = useState('');
-  
+
   /** @type {[MuscleGroup[], React.Dispatch<React.SetStateAction<MuscleGroup[]>>]} */
   const [allMuscleGroups, setAllMuscleGroups] = useState([]);
 
@@ -89,24 +89,24 @@ function EditRoutinePage() {
       setAllMuscleGroups(muscleGroupsData || []);
 
       if (routineId !== 'new') {
-    const { data, error } = await supabase
-      .from('workout_routines')
-      .select(`*, routine_exercises(*, exercises(*))`)
-      .eq('id', routineId)
-      .single();
+        const { data, error } = await supabase
+          .from('workout_routines')
+          .select(`*, routine_exercises(*, exercises(*))`)
+          .eq('id', routineId)
+          .single();
         if (error) throw error;
-        
+
         if (data) {
-            setRoutineName(data.routine_name);
-            const rawItems = Array.isArray(data.routine_exercises) ? data.routine_exercises : [];
-            const sortedExercises = rawItems.sort((a, b) => (a.exercise_order || 0) - (b.exercise_order || 0));
-            const formattedExercises = sortedExercises.map(item => ({
-                // Guard nested relation; some DB/RLS setups may omit nested `exercises`.
-                ...(item.exercises || {}),
-                sets: item.target_sets,
-                reps: '8-12',
-            }));
-            setRoutineExercises(formattedExercises.filter(Boolean));
+          setRoutineName(data.routine_name);
+          const rawItems = Array.isArray(data.routine_exercises) ? data.routine_exercises : [];
+          const sortedExercises = rawItems.sort((a, b) => (a.exercise_order || 0) - (b.exercise_order || 0));
+          const formattedExercises = sortedExercises.map(item => ({
+            // Guard nested relation; some DB/RLS setups may omit nested `exercises`.
+            ...(item.exercises || {}),
+            sets: item.target_sets,
+            reps: '8-12',
+          }));
+          setRoutineExercises(formattedExercises.filter(Boolean));
         }
       }
     } catch (error) {
@@ -124,7 +124,7 @@ function EditRoutinePage() {
   // This effect is intended to run only on mount/unmount to clean up timers
   // and abort controllers. It intentionally uses an empty dependency array
   // to ensure the cleanup runs only once on unmount.
-   
+
   useEffect(() => {
     return () => {
       if (searchDebounceRef.current) {
@@ -182,6 +182,8 @@ function EditRoutinePage() {
           ...item,
           is_external: data?.source === 'external',
         }));
+        console.log('Exercise search results:', results);
+        console.log('Search data source:', data?.source);
         setSearchResults(results);
       } catch (error) {
         if (error?.name === 'AbortError') {
@@ -196,8 +198,9 @@ function EditRoutinePage() {
       }
     }, 300);
   }, []);
-  
+
   const handleAddExercise = (exerciseToAdd) => {
+    console.log('Adding exercise to routine:', exerciseToAdd);
     const newExercise = { ...exerciseToAdd, sets: 3, reps: '8-12' };
     setRoutineExercises([...routineExercises, newExercise]);
     setSearchTerm('');
@@ -238,26 +241,39 @@ function EditRoutinePage() {
         if (existingExercise) {
           return { ...ex, id: existingExercise.id };
         }
-        
+
+        // Insert new exercise with all fields from AI-generated data
+        console.log('Inserting new exercise with data:', {
+          name: ex.name,
+          description: ex.description,
+          instructions: ex.instructions,
+          primary_muscle: ex.primary_muscle,
+          secondary_muscle: ex.secondary_muscle,
+          tertiary_muscle: ex.tertiary_muscle,
+          equipment_needed: ex.equipment_needed,
+          difficulty_level: ex.difficulty_level,
+          exercise_type: ex.exercise_type,
+        });
+
         const { data: newExercise, error: insertError } = await supabase
           .from('exercises')
-          .insert({ name: ex.name, description: ex.description, category_id: ex.category_id, type: ex.type })
+          .insert({
+            name: ex.name,
+            description: ex.description || null,
+            instructions: ex.instructions || null,
+            primary_muscle: ex.primary_muscle || null,
+            secondary_muscle: ex.secondary_muscle || null,
+            tertiary_muscle: ex.tertiary_muscle || null,
+            equipment_needed: ex.equipment_needed || null,
+            difficulty_level: ex.difficulty_level || null,
+            exercise_type: ex.exercise_type || ex.type || 'Strength',
+            thumbnail_url: ex.thumbnail_url || null,
+            video_url: ex.video_url || null
+          })
           .select('id')
           .single();
 
         if (insertError) throw insertError;
-
-        const muscleGroup = allMuscleGroups.find(
-          mg => mg.name.toLowerCase() === (ex.primary_muscle || 'core').toLowerCase()
-        );
-        
-        const muscleGroupId = muscleGroup ? muscleGroup.id : allMuscleGroups.find(mg => mg.name === 'Core')?.id;
-
-        if (muscleGroupId) {
-          await supabase
-            .from('exercise_muscle_groups')
-            .insert({ exercise_id: newExercise.id, muscle_group_id: muscleGroupId });
-        }
 
         return { ...ex, id: newExercise.id };
       })
@@ -273,8 +289,8 @@ function EditRoutinePage() {
       if (routineId === 'new') {
         const { data: newRoutine, error: routineError } = await supabase.from('workout_routines').insert({ routine_name: routineName, user_id: user.id }).select('id').single();
         if (routineError) throw routineError;
-        
-        await supabase.from('routine_exercises').insert(exercisesToInsert.map(e => ({...e, routine_id: newRoutine.id})));
+
+        await supabase.from('routine_exercises').insert(exercisesToInsert.map(e => ({ ...e, routine_id: newRoutine.id })));
       } else {
         // Call the new Edge Function to replace routine exercises
         const { data, error: edgeError } = await supabase.functions.invoke('replace-routine-exercises', {
@@ -293,7 +309,7 @@ function EditRoutinePage() {
       alert(`Error saving routine: ${error.message}`);
     }
   };
-  
+
   const moveExercise = (index, direction) => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === routineExercises.length - 1)) return;
     const newIndex = direction === 'up' ? index - 1 : index + 1;
@@ -301,7 +317,7 @@ function EditRoutinePage() {
     [items[index], items[newIndex]] = [items[newIndex], items[index]];
     setRoutineExercises(items);
   };
-  
+
   const openCustomExerciseModal = () => {
     setCustomExerciseName(searchTerm);
     setIsCustomModalOpen(true);
@@ -313,29 +329,28 @@ function EditRoutinePage() {
     e.preventDefault();
     if (!customExerciseName || !selectedMuscleGroupId) return alert("Please provide a name and select a muscle group.");
     try {
-        const { data: newExerciseData, error: insertError } = await supabase
-            .from('exercises')
-            .insert({ name: customExerciseName, type: 'Strength' })
-            .select('id')
-            .single();
+      // Get the muscle group name to use as primary_muscle
+      const muscleGroup = allMuscleGroups.find(mg => mg.id === selectedMuscleGroupId);
+      const muscleName = muscleGroup?.name || 'Core';
 
-        if (insertError) throw insertError;
-        
-        await supabase.from('exercise_muscle_groups').insert({ exercise_id: newExerciseData.id, muscle_group_id: selectedMuscleGroupId });
-        
-        const { data: fullNewExercise, error: fetchError } = await supabase
-            .from('exercises')
-            .select('*, exercise_muscle_groups(*, muscle_groups(*))')
-            .eq('id', newExerciseData.id)
-            .single();
-        
-        if (fetchError) throw fetchError;
+      const { data: newExerciseData, error: insertError } = await supabase
+        .from('exercises')
+        .insert({
+          name: customExerciseName,
+          exercise_type: 'Strength',
+          primary_muscle: muscleName,
+          difficulty_level: 'Intermediate'
+        })
+        .select('*')
+        .single();
 
-        handleAddExercise(fullNewExercise);
-        closeCustomExerciseModal();
+      if (insertError) throw insertError;
+
+      handleAddExercise(newExerciseData);
+      closeCustomExerciseModal();
 
     } catch (error) {
-        alert(`Error creating custom exercise: ${error.message}`);
+      alert(`Error creating custom exercise: ${error.message}`);
     }
   };
 
@@ -343,11 +358,11 @@ function EditRoutinePage() {
 
   return (
     <div className="edit-routine-page-container">
-      <SubPageHeader title={routineId === 'new' ? 'Create Routine' : 'Edit Routine'} icon={<Dumbbell size={28}/>} iconColor="#f97316" backTo="/workouts/routines" />
-      
+      <SubPageHeader title={routineId === 'new' ? 'Create Routine' : 'Edit Routine'} icon={<Dumbbell size={28} />} iconColor="#f97316" backTo="/workouts/routines" />
+
       <div className="form-group">
-  <label htmlFor="routineName">Routine Name</label>
-  <input type="text" id="routineName" value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="e.g., Push Day" required />
+        <label htmlFor="routineName">Routine Name</label>
+        <input type="text" id="routineName" value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="e.g., Push Day" required />
       </div>
 
       <div className="add-exercise-section">
@@ -387,9 +402,9 @@ function EditRoutinePage() {
               <button onClick={() => moveExercise(index, 'up')} disabled={index === 0}><ArrowUpCircle size={24} /></button>
               <button onClick={() => moveExercise(index, 'down')} disabled={index === routineExercises.length - 1}><ArrowDownCircle size={24} /></button>
             </div>
-            <img 
-              src={ex.thumbnail_url || 'https://placehold.co/50x50/4a5568/ffffff?text=IMG'} 
-              alt={ex.name} 
+            <img
+              src={ex.thumbnail_url || 'https://placehold.co/50x50/4a5568/ffffff?text=IMG'}
+              alt={ex.name}
               className="exercise-thumbnail"
               width="50"
               height="50"

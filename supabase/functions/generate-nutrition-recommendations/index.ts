@@ -1,11 +1,26 @@
 /**
- * generate-nutrition-recommendations
- * Edge Function that returns personalized nutrition recommendations for an
- * authenticated user. Inputs:
- * - Authorization header with a valid access token
- * - SUPABASE_URL and SUPABASE_ANON_KEY available in function env
- * Output: JSON object matching { analysis_summary, recommendations }
- * Errors: returns 401 for auth failures, 503 if OPENAI_API_KEY is missing.
+ * @file supabase/functions/generate-nutrition-recommendations/index.ts
+ * @description Edge Function that generates personalized nutrition recommendations using OpenAI.
+ * 
+ * @project Felony Fitness
+ * 
+ * @workflow
+ * 1. Authenticates user via Supabase auth token (Authorization header)
+ * 2. Fetches user profile (goals, dietary preferences, activity level)
+ * 3. Fetches recent body metrics (weight, body fat %)
+ * 4. Fetches nutrition logs and resolves food servings (last 7 days)
+ * 5. Fetches workout history for context (last 7 days)
+ * 6. Aggregates food consumption by category
+ * 7. Constructs detailed prompt for OpenAI with nutrition focus
+ * 8. Returns AI-generated analysis and actionable nutrition recommendations
+ * 
+ * @critical_fixes
+ * - 2025-11-06: Changed 'dob' to 'date_of_birth' to match database schema
+ * - 2025-11-06: Added fitness_goal, activity_level, daily_carb_goal, daily_fat_goal
+ * - 2025-11-06: Enhanced TypeScript interfaces for new fields
+ * 
+ * @note This file runs on Deno inside Supabase Edge Functions and uses Deno globals.
+ * @note Nutrition logs query avoids nested JOINs to prevent RLS issues.
  */
 
 // Minimal local type shims so TypeScript can check this Deno-run file.
@@ -21,12 +36,28 @@ import { corsHeaders } from '../_shared/cors.ts';
 const OPENAI_API_KEY: string | undefined = Deno.env.get('OPENAI_API_KEY');
 
 // --- Types used in this function ---
+/**
+ * User profile data from user_profiles table.
+ * @property {string} date_of_birth - User's date of birth in ISO format (YYYY-MM-DD)
+ * @property {string} sex - User's biological sex
+ * @property {number} daily_calorie_goal - Target daily calories
+ * @property {number} daily_protein_goal - Target daily protein in grams
+ * @property {number} daily_carb_goal - Target daily carbohydrates in grams
+ * @property {number} daily_fat_goal - Target daily fats in grams
+ * @property {string} diet_preference - Dietary restrictions (vegetarian, vegan, etc.)
+ * @property {string} fitness_goal - User's fitness objective (build_muscle, lose_weight, etc.)
+ * @property {string} activity_level - User's activity level (sedentary, very_active, etc.)
+ */
 interface UserProfile {
-  dob?: string | null;
+  date_of_birth?: string | null;
   sex?: string | null;
   daily_calorie_goal?: number | null;
   daily_protein_goal?: number | null;
+  daily_carb_goal?: number | null;
+  daily_fat_goal?: number | null;
   diet_preference?: string | null;
+  fitness_goal?: string | null;
+  activity_level?: string | null;
 }
 
 interface BodyMetrics {
@@ -48,6 +79,15 @@ interface NutritionLogEntry {
   food_servings?: FoodServing[] | null;
 }
 
+/**
+ * Calculate user's age from date of birth.
+ * 
+ * @param {string|null|undefined} dob - Date of birth in ISO format (YYYY-MM-DD)
+ * @returns {number|null} Age in years, or null if dob not provided
+ * 
+ * @example
+ * calculateAge('1990-05-15') // Returns 35 (as of 2025)
+ */
 const calculateAge = (dob: string | null | undefined) => {
   if (!dob) return null;
   const birthDate = new Date(dob);
@@ -111,8 +151,8 @@ Deno.serve(async (req: Request) => {
 
     const maskedPrefix = accessToken.slice(0, 12) + '...';
 
-  // Supabase client library types are not available here; cast to any for typed destructuring.
-  const { data: { user } = {}, error: authError }: { data?: { user?: any }, error?: any } = await (supabase as any).auth.getUser();
+    // Supabase client library types are not available here; cast to any for typed destructuring.
+    const { data: { user } = {}, error: authError }: { data?: { user?: any }, error?: any } = await (supabase as any).auth.getUser();
     if (authError || !user) {
       console.error(JSON.stringify({
         event: 'auth.resolve_user',
@@ -132,13 +172,28 @@ Deno.serve(async (req: Request) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+    /**
+     * Fetch user data from multiple tables in parallel.
+     * 
+     * COLUMN FIX (2025-11-06): Changed 'dob' to 'date_of_birth' to match actual database schema.
+     * This was causing 400 errors identical to the workout recommendations function issue.
+     * 
+     * Query structure:
+     * - user_profiles: Basic demographics, goals, and dietary preferences
+     * - body_metrics: Most recent weight and body composition
+     * - nutrition_logs: Food consumption history (last 7 days)
+     * - workout_logs: Exercise activity (last 7 days)
+     * 
+     * @note nutrition_logs query is intentionally simple to avoid RLS issues with nested JOINs.
+     * Food servings data is fetched separately and joined in memory.
+     */
     const [profileRes, metricsRes, nutritionRes, workoutRes] = await Promise.all([
       supabase
         .from('user_profiles')
         // Include diet_preference when available so recommendations can respect
         // vegetarian/vegan preferences. If the column is not present in the DB
         // the query will surface an error which the function will report.
-        .select('dob, sex, daily_calorie_goal, daily_protein_goal, diet_preference')
+        .select('date_of_birth, sex, daily_calorie_goal, daily_protein_goal, diet_preference, fitness_goal, activity_level, daily_carb_goal, daily_fat_goal')
         .eq('id', userId)
         .single(),
       supabase
@@ -205,8 +260,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('User profile not found. Cannot generate recommendations without goals.');
     }
 
-  const userProfile = profileRes.data as UserProfile;
-  const latestMetrics = metricsRes.data as BodyMetrics | undefined;
+    const userProfile = profileRes.data as UserProfile;
+    const latestMetrics = metricsRes.data as BodyMetrics | undefined;
 
     // Build category counts. Support two storage patterns:
     // 1) `nutrition_logs` contains a `food_servings` JSON array on the row.
@@ -307,19 +362,23 @@ Deno.serve(async (req: Request) => {
       })
       .join('\n') || 'No workouts logged.';
 
-  const prompt = [
+    const prompt = [
       'You are an expert fitness and nutrition coach for Felony Fitness, an organization helping formerly incarcerated individuals.',
       'Your tone should be encouraging, straightforward, and supportive.',
       'Analyze the following user data from the last 7 days and provide 3 actionable nutrition-related recommendations.',
       'User Profile:',
-      '- Age: ' + (calculateAge(userProfile.dob)),
+      '- Age: ' + (calculateAge(userProfile.date_of_birth)),
       '- Sex: ' + (userProfile.sex ?? 'Unknown'),
       '- Weight: ' + (latestMetrics?.weight_lbs || 'N/A') + ' lbs',
       '- Body Fat: ' + (latestMetrics?.body_fat_percentage || 'N/A') + '%',
-  'User Goals:',
-  '- Calories: ' + (userProfile.daily_calorie_goal ?? 'N/A'),
-  '- Protein: ' + (userProfile.daily_protein_goal ?? 'N/A') + 'g',
-  '- Diet: ' + (userProfile.diet_preference ?? 'None'),
+      '- Fitness Goal: ' + (userProfile.fitness_goal ?? 'Not set'),
+      '- Activity Level: ' + (userProfile.activity_level ?? 'Not set'),
+      'User Goals:',
+      '- Calories: ' + (userProfile.daily_calorie_goal ?? 'N/A'),
+      '- Protein: ' + (userProfile.daily_protein_goal ?? 'N/A') + 'g',
+      '- Carbs: ' + (userProfile.daily_carb_goal ?? 'N/A') + 'g',
+      '- Fats: ' + (userProfile.daily_fat_goal ?? 'N/A') + 'g',
+      '- Diet: ' + (userProfile.diet_preference ?? 'None'),
       '7-Day Nutrition Summary (by category):',
       (nutritionSummary || 'No nutrition logged.'),
       'Recent Workouts:',

@@ -34,7 +34,7 @@
  * <Link to="/profile">View Profile</Link>
  */
 
-import { Calendar, Edit2 as EditIcon, HeartPulse, Percent, User, Weight, X } from 'lucide-react';
+import { Calendar, Edit2 as EditIcon, HeartPulse, MapPin, Percent, Phone, User, Weight, X } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import Modal from 'react-modal';
 import { Link } from 'react-router-dom';
@@ -221,7 +221,7 @@ const calculateAge = (dob) => {
 function ProfilePage() {
   // Authentication context integration
   const { user } = useAuth(); // Get current authenticated user from AuthContext
-  
+
   /**
    * Current user's unique identifier
    * @type {string|undefined}
@@ -237,7 +237,7 @@ function ProfilePage() {
    * - Form state is initialized with empty strings to prevent uncontrolled inputs
    * - Age calculation is performed client-side for real-time updates
    */
-  
+
   // Body metrics form state management
   /**
    * Current weight input value for body metrics form
@@ -245,14 +245,14 @@ function ProfilePage() {
    * @description String representation of weight in pounds, validated on submission
    */
   const [weight, setWeight] = useState('');
-  
+
   /**
    * Current body fat percentage input value for body metrics form
    * @type {string}
    * @description String representation of body fat percentage, validated on submission
    */
   const [bodyFat, setBodyFat] = useState('');
-  
+
   /**
    * User feedback message for metric logging operations
    * @type {string}
@@ -267,31 +267,51 @@ function ProfilePage() {
    * @property {string} dob - Date of birth in YYYY-MM-DD format
    * @property {string} sex - Gender selection (male, female, other - lowercase per DB constraint)
    * @property {string} diet_preference - Dietary preference (Vegetarian, Vegan, or empty)
+   * @property {string} first_name - User's first name
+   * @property {string} last_name - User's last name
+   * @property {string} phone - Phone number
+   * @property {string} address - Street address
+   * @property {string} city - City
+   * @property {string} state - State/Province
+   * @property {string} zip_code - ZIP/Postal code
    * @description Initialized with empty strings to ensure controlled inputs
    */
-  const [profile, setProfile] = useState({ dob: '', sex: '', diet_preference: '', heightFeet: '', heightInches: '' });
-  
+  const [profile, setProfile] = useState({
+    dob: '',
+    sex: '',
+    diet_preference: '',
+    heightFeet: '',
+    heightInches: '',
+    first_name: '',
+    last_name: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: ''
+  });
+
   /**
    * Calculated age from date of birth
    * @type {number|null}
    * @description Age in years calculated from DOB, null if DOB not provided
    */
   const [age, setAge] = useState(null);
-  
+
   /**
    * Profile form edit mode state
    * @type {boolean}
    * @description Controls whether profile form is in edit or display mode
    */
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  
+
   /**
    * User feedback message for profile operations
    * @type {string}
    * @description Success/error messages displayed after profile form submission
    */
   const [profileMessage, setProfileMessage] = useState('');
-  
+
   // Data display and UI control state
   /**
    * Historical body metrics data array
@@ -304,14 +324,14 @@ function ProfilePage() {
    * @property {string} created_at - ISO timestamp of when the measurement was recorded
    */
   const [history, setHistory] = useState([]);
-  
+
   /**
    * Body fat estimation modal visibility state
    * @type {boolean}
    * @description Controls the display of the body fat percentage estimation guide modal
    */
   const [isBodyFatModalOpen, setBodyFatModalOpen] = useState(false);
-  
+
   /**
    * Initial data loading state
    * @type {boolean}
@@ -415,13 +435,13 @@ function ProfilePage() {
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(10),
-          
+
         // Fetch user profile information
         // Note: Using actual column names from database schema
         // Query by id (primary key) which matches the user's auth ID
         supabase
           .from('user_profiles')
-          .select('date_of_birth, sex, diet_preference, height_cm')
+          .select('date_of_birth, sex, diet_preference, height_cm, first_name, last_name, phone, address, city, state, zip_code')
           .eq('id', userId)
           .single()
       ]);
@@ -429,21 +449,21 @@ function ProfilePage() {
       // Process body metrics query results
       const { data: metricsData, error: metricsError } = metricsRes;
       if (metricsError) throw metricsError;
-      
+
       // Update history state with fetched metrics data
       // Fallback to empty array if no data returned
       setHistory(metricsData || []);
-      
+
       // Process user profile query results
       const { data: profileData, error: profileError } = profileRes;
-      
+
       // Handle profile query errors
       // PGRST116 indicates no profile record exists (valid for new users)
       // All other errors should be thrown and handled by catch block
       if (profileError && profileError.code !== 'PGRST116') {
         throw profileError;
       }
-      
+
       if (profileData) {
         // Profile exists - populate form with data
         // Map database fields to component state
@@ -454,18 +474,25 @@ function ProfilePage() {
           heightFeet = Math.floor(totalInches / 12).toString();
           heightInches = Math.round(totalInches % 12).toString();
         }
-        
+
         setProfile({
           dob: profileData.date_of_birth || '',
           sex: profileData.sex || '',
           diet_preference: profileData.diet_preference || '',
           heightFeet: heightFeet,
-          heightInches: heightInches
+          heightInches: heightInches,
+          first_name: profileData.first_name || '',
+          last_name: profileData.last_name || '',
+          phone: profileData.phone || '',
+          address: profileData.address || '',
+          city: profileData.city || '',
+          state: profileData.state || '',
+          zip_code: profileData.zip_code || ''
         });
-        
+
         // Calculate and set user's age from date of birth
         setAge(calculateAge(profileData.date_of_birth));
-        
+
         // Determine if profile editing should be forced
         // Required fields: date_of_birth and sex
         const isProfileIncomplete = !profileData.date_of_birth || !profileData.sex;
@@ -477,7 +504,7 @@ function ProfilePage() {
     } catch (error) {
       // Log detailed error information for debugging
       console.error("Error fetching profile data:", error);
-      
+
       // Could add user-visible error notification here
       // For now, we fail silently and let the user try again
     } finally {
@@ -522,7 +549,7 @@ function ProfilePage() {
       setLoading(false);
     }
   }, [userId, fetchData]);
-  
+
   /**
    * Handles input changes in the profile form
    * 
@@ -646,18 +673,18 @@ function ProfilePage() {
    */
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Update profile state with new value
     // Using functional update to ensure immutability
     setProfile(prev => ({ ...prev, [name]: value }));
-    
+
     // Special handling for date of birth changes
     // Recalculate age in real-time for immediate user feedback
     if (name === 'dob') {
       setAge(calculateAge(value));
     }
   };
-  
+
   /**
    * Handles user profile form submission and database persistence
    * 
@@ -787,43 +814,50 @@ function ProfilePage() {
   const handleProfileUpdate = async (e) => {
     // Prevent default form submission behavior
     e.preventDefault();
-    
+
     // Validate user authentication before proceeding
     if (!user) {
       setProfileMessage("Error: Could not save profile. Please refresh and try again.");
       return;
     }
-    
+
     try {
       // Prepare and validate data before database operation
       const profileData = {
         id: user.id,
         user_id: user.id,
         sex: profile.sex,
-        diet_preference: profile.diet_preference
+        diet_preference: profile.diet_preference,
+        first_name: profile.first_name || null,
+        last_name: profile.last_name || null,
+        phone: profile.phone || null,
+        address: profile.address || null,
+        city: profile.city || null,
+        state: profile.state || null,
+        zip_code: profile.zip_code || null
       };
 
       // Add height if provided (convert feet/inches to cm)
       if (profile.heightFeet || profile.heightInches) {
         const feet = parseFloat(profile.heightFeet) || 0;
         const inches = parseFloat(profile.heightInches) || 0;
-        
+
         // Validate reasonable ranges
         if (feet < 0 || feet > 8 || inches < 0 || inches >= 12) {
           setProfileMessage('Please enter a valid height (feet: 0-8, inches: 0-11).');
           return;
         }
-        
+
         // Convert to total inches, then to cm
         const totalInches = (feet * 12) + inches;
         const heightCm = Math.round(totalInches * 2.54); // Convert inches to cm and round
-        
+
         // Validate final cm value is reasonable (3-8 feet range)
         if (heightCm < 91 || heightCm > 244) { // ~3ft to ~8ft
           setProfileMessage('Please enter a reasonable height.');
           return;
         }
-        
+
         profileData.height_cm = heightCm;
       }
 
@@ -852,7 +886,7 @@ function ProfilePage() {
       const { error } = await supabase
         .from('user_profiles')
         .upsert(profileData);
-      
+
       if (error) {
         // Display database error message to user
         setProfileMessage(error.message);
@@ -860,7 +894,7 @@ function ProfilePage() {
         // Success - provide feedback and update UI state
         setProfileMessage('Profile saved!');
         setIsEditingProfile(false);
-        
+
         // Clear success message after 3 seconds for clean UX
         setTimeout(() => setProfileMessage(''), 3000);
       }
@@ -986,13 +1020,13 @@ function ProfilePage() {
   const handleLogMetric = async (e) => {
     // Prevent default form submission behavior
     e.preventDefault();
-    
+
     // Validate that at least one measurement is provided
     if (!weight && !bodyFat) {
       setMessage('Please enter at least one measurement.');
       return;
     }
-    
+
     // Validate user authentication
     if (!user) {
       setMessage("User not found, please refresh.");
@@ -1015,21 +1049,21 @@ function ProfilePage() {
         .insert(newMetric)
         .select()
         .single();
-        
+
       if (error) {
         // Display database error to user
         setMessage(error.message);
       } else {
         // Success - update UI and provide feedback
         setMessage('Measurement saved!');
-        
+
         // Add new measurement to top of history list for immediate visibility
         setHistory(prevHistory => [data, ...prevHistory]);
-        
+
         // Clear form inputs for next entry
         setWeight('');
         setBodyFat('');
-        
+
         // Clear success message after 3 seconds for clean UX
         setTimeout(() => setMessage(''), 3000);
       }
@@ -1058,7 +1092,7 @@ function ProfilePage() {
     if (!history || history.length === 0) {
       return { weight_lbs: null, body_fat_percentage: null };
     }
-    
+
     // Get the most recent entry (first in array since it's ordered by created_at DESC)
     const latest = history[0];
     return {
@@ -1069,16 +1103,16 @@ function ProfilePage() {
 
   // Display a loading message while data is being fetched.
   if (loading) {
-    return <div style={{color: 'white', padding: '2rem'}}>Loading Profile...</div>;
+    return <div style={{ color: 'white', padding: '2rem' }}>Loading Profile...</div>;
   }
 
   return (
     <div className="profile-page-container">
       <SubPageHeader title="Profile & Metrics" icon={<User size={28} />} iconColor="#f97316" backTo="/dashboard" />
-      
+
       {/* User Profile Section: Toggles between edit form and display view */}
       <div className="profile-form metric-form">
-        <h2>Your Information</h2>
+        <h2>Critical Statistics</h2>
         {isEditingProfile ? (
           <form onSubmit={handleProfileUpdate}>
             {/* Form fields for Date of Birth and Sex */}
@@ -1106,28 +1140,28 @@ function ProfilePage() {
               <div className="height-inputs">
                 <div className="input-with-icon">
                   <User size={18} />
-                  <input 
-                    id="heightFeet" 
-                    name="heightFeet" 
-                    type="number" 
-                    min="0" 
-                    max="8" 
+                  <input
+                    id="heightFeet"
+                    name="heightFeet"
+                    type="number"
+                    min="0"
+                    max="8"
                     step="1"
-                    value={profile.heightFeet} 
+                    value={profile.heightFeet}
                     onChange={handleProfileChange}
                     placeholder="5"
                   />
                   <span className="unit-label">ft</span>
                 </div>
                 <div className="input-with-icon">
-                  <input 
-                    id="heightInches" 
-                    name="heightInches" 
-                    type="number" 
-                    min="0" 
-                    max="11" 
+                  <input
+                    id="heightInches"
+                    name="heightInches"
+                    type="number"
+                    min="0"
+                    max="11"
                     step="1"
-                    value={profile.heightInches} 
+                    value={profile.heightInches}
                     onChange={handleProfileChange}
                     placeholder="9"
                   />
@@ -1135,44 +1169,44 @@ function ProfilePage() {
                 </div>
               </div>
             </div>
-              <div className="form-group">
-                <label htmlFor="diet_preference">Diet Preference</label>
-                <div className="input-with-icon">
-                  <select id="diet_preference" name="diet_preference" value={profile.diet_preference} onChange={handleProfileChange}>
-                    <option value="">None</option>
-                    <option value="Vegetarian">Vegetarian</option>
-                    <option value="Vegan">Vegan</option>
-                  </select>
-                </div>
+
+            <div className="form-group">
+              <label htmlFor="diet_preference">Diet Preference</label>
+              <div className="input-with-icon">
+                <select id="diet_preference" name="diet_preference" value={profile.diet_preference} onChange={handleProfileChange}>
+                  <option value="">None</option>
+                  <option value="Vegetarian">Vegetarian</option>
+                  <option value="Vegan">Vegan</option>
+                </select>
               </div>
+            </div>
             {/* Live region for profile messages */}
             <div className="form-message" role="status" aria-live="polite" aria-atomic="true">{profileMessage || ''}</div>
-            <button type="submit" className="save-button">Save Profile</button>
+            <button type="submit" className="save-button">Save Statistics</button>
           </form>
         ) : (
           <div className="profile-display">
-            {/* Display for saved Age and Sex */}
-            <div className="profile-stat">
-              <span className="label">Age</span>
-              <span className="value">{age || 'N/A'}</span>
-            </div>
-            <div className="profile-stat">
-              <span className="label">Sex</span>
-              <span className="value">{profile.sex || 'N/A'}</span>
-            </div>
-            <div className="profile-stat">
-              <span className="label">Height</span>
-              <span className="value">
-                {(profile.heightFeet || profile.heightInches) 
-                  ? `${profile.heightFeet || 0}'${profile.heightInches || 0}"` 
+            <div className="compact-stats">
+              <span className="stat-item">
+                <strong>Age:</strong> {age || 'N/A'}
+              </span>
+              <span className="stat-separator">•</span>
+              <span className="stat-item">
+                <strong>Sex:</strong> {profile.sex || 'N/A'}
+              </span>
+              <span className="stat-separator">•</span>
+              <span className="stat-item">
+                <strong>Height:</strong> {(profile.heightFeet || profile.heightInches)
+                  ? `${profile.heightFeet || 0}'${profile.heightInches || 0}"`
                   : 'N/A'
                 }
               </span>
+              <span className="stat-separator">•</span>
+              <span className="stat-item">
+                <strong>Diet:</strong> {profile.diet_preference || 'None'}
+              </span>
             </div>
-            <div className="profile-stat">
-              <span className="label">Diet</span>
-              <span className="value">{profile.diet_preference || 'None'}</span>
-            </div>
+
             <button className="edit-button" onClick={() => setIsEditingProfile(true)}>
               <EditIcon size={16} /> Edit
             </button>
@@ -1210,7 +1244,7 @@ function ProfilePage() {
           })()}
         </div>
       </div>
-      
+
       {/* Metric Logging Section */}
       <form onSubmit={handleLogMetric} className="metric-form">
         <h2>Log Today's Measurements</h2>
@@ -1233,8 +1267,8 @@ function ProfilePage() {
             <input id="bodyFat" type="number" placeholder="e.g., 15.2" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} step="0.1" />
           </div>
         </div>
-  {/* Live region for metric save messages */}
-  <div className="form-message" role="status" aria-live="polite" aria-atomic="true">{message || ''}</div>
+        {/* Live region for metric save messages */}
+        <div className="form-message" role="status" aria-live="polite" aria-atomic="true">{message || ''}</div>
         <button type="submit" className="save-button">Save Measurement</button>
       </form>
 
@@ -1242,24 +1276,190 @@ function ProfilePage() {
       <div className="history-section">
         <h2>Recent History</h2>
         {history.length === 0 ? <p>No measurements logged yet.</p> : (
-            <ul className="history-list">
-              {history.map(metric => (
-                <li key={metric.id} className="history-item">
-                  <span className="history-date">{new Date(metric.created_at).toLocaleDateString()}</span>
-                  <div className="history-values">
-                    {metric.weight_lbs && <span>{metric.weight_lbs} lbs</span>}
-                    {metric.body_fat_percentage && <span>{metric.body_fat_percentage}% fat</span>}
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <ul className="history-list">
+            {history.map(metric => (
+              <li key={metric.id} className="history-item">
+                <span className="history-date">{new Date(metric.created_at).toLocaleDateString()}</span>
+                <div className="history-values">
+                  {metric.weight_lbs && <span>{metric.weight_lbs} lbs</span>}
+                  {metric.body_fat_percentage && <span>{metric.body_fat_percentage}% fat</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Contact Information Section */}
+      <div className="profile-form metric-form">
+        <h2>Contact Information</h2>
+        {isEditingProfile ? (
+          <form onSubmit={handleProfileUpdate}>
+            <div className="form-group">
+              <label htmlFor="contact_first_name">First Name</label>
+              <div className="input-with-icon">
+                <User size={18} />
+                <input
+                  id="contact_first_name"
+                  name="first_name"
+                  type="text"
+                  value={profile.first_name}
+                  onChange={handleProfileChange}
+                  placeholder="First Name"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_last_name">Last Name</label>
+              <div className="input-with-icon">
+                <User size={18} />
+                <input
+                  id="contact_last_name"
+                  name="last_name"
+                  type="text"
+                  value={profile.last_name}
+                  onChange={handleProfileChange}
+                  placeholder="Last Name"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_phone">Phone</label>
+              <div className="input-with-icon">
+                <Phone size={18} />
+                <input
+                  id="contact_phone"
+                  name="phone"
+                  type="tel"
+                  value={profile.phone}
+                  onChange={handleProfileChange}
+                  placeholder="(555) 555-5555"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_address">Address</label>
+              <div className="input-with-icon">
+                <MapPin size={18} />
+                <input
+                  id="contact_address"
+                  name="address"
+                  type="text"
+                  value={profile.address}
+                  onChange={handleProfileChange}
+                  placeholder="Street Address"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_city">City</label>
+              <div className="input-with-icon">
+                <MapPin size={18} />
+                <input
+                  id="contact_city"
+                  name="city"
+                  type="text"
+                  value={profile.city}
+                  onChange={handleProfileChange}
+                  placeholder="City"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_state">State</label>
+              <div className="input-with-icon">
+                <MapPin size={18} />
+                <input
+                  id="contact_state"
+                  name="state"
+                  type="text"
+                  value={profile.state}
+                  onChange={handleProfileChange}
+                  placeholder="State"
+                  maxLength="2"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="contact_zip_code">ZIP Code</label>
+              <div className="input-with-icon">
+                <MapPin size={18} />
+                <input
+                  id="contact_zip_code"
+                  name="zip_code"
+                  type="text"
+                  value={profile.zip_code}
+                  onChange={handleProfileChange}
+                  placeholder="12345"
+                  maxLength="10"
+                />
+              </div>
+            </div>
+
+            <div className="form-message" role="status" aria-live="polite" aria-atomic="true">{profileMessage || ''}</div>
+            <button type="submit" className="save-button">Save Contact Info</button>
+          </form>
+        ) : (
+          <div className="profile-display">
+            {(profile.first_name || profile.last_name) ? (
+              <div className="profile-stat">
+                <span className="label">Name</span>
+                <span className="value">
+                  {[profile.first_name, profile.last_name].filter(Boolean).join(' ')}
+                </span>
+              </div>
+            ) : null}
+
+            {profile.phone ? (
+              <div className="profile-stat">
+                <span className="label">Phone</span>
+                <span className="value">{profile.phone}</span>
+              </div>
+            ) : null}
+
+            {profile.address ? (
+              <div className="profile-stat">
+                <span className="label">Address</span>
+                <span className="value">{profile.address}</span>
+              </div>
+            ) : null}
+
+            {(profile.city || profile.state || profile.zip_code) ? (
+              <div className="profile-stat">
+                <span className="label">Location</span>
+                <span className="value">
+                  {[
+                    profile.city,
+                    profile.state,
+                    profile.zip_code
+                  ].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            ) : null}
+
+            {!profile.first_name && !profile.last_name && !profile.phone && !profile.address && !profile.city && !profile.state && !profile.zip_code ? (
+              <p className="no-data-message">
+                No contact information yet. Click Edit to add your details.
+              </p>
+            ) : null}
+
+            <button className="edit-button" onClick={() => setIsEditingProfile(true)}>
+              <EditIcon size={16} /> Edit Contact Info
+            </button>
+          </div>
         )}
       </div>
 
       <Link to="/my-plan" className="link-button">
         Go to My Plan
       </Link>
-      
+
       {/* Modal for Body Fat Estimation Guide */}
       <Modal
         isOpen={isBodyFatModalOpen}
@@ -1274,7 +1474,7 @@ function ProfilePage() {
         </div>
         <div className="modal-body">
           {/* Conditionally render content based on the user's selected sex */}
-          { (profile.sex === 'male' || profile.sex === 'female') ? (
+          {(profile.sex === 'male' || profile.sex === 'female') ? (
             <>
               <p className="modal-subtitle">These are visual estimates. For accurate measurements, consult a professional.</p>
               <div className="bodyfat-grid">

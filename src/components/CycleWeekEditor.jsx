@@ -35,7 +35,7 @@ function isDeloadFocus(focus) {
  * @param {Array<{week_index:number,day_index:number,type:'routine'|'rest'|'deload',routine_id: (string|null)}>} [props.initialAssignments=[]] - Optional initial assignments; used only when its length equals weeks * 7.
  * @returns {JSX.Element} The CycleWeekEditor React element.
  */
-function CycleWeekEditor({ weeks = 4, focus = 'Hypertrophy', onAssignmentsChange = () => {}, initialAssignments = [] }) {
+function CycleWeekEditor({ weeks = 4, focus = 'Hypertrophy', onAssignmentsChange = () => { }, initialAssignments = [] }) {
   // Defensive normalization: ensure `weeks` is a finite positive integer.
   // Fall back to 4 weeks when input is missing or invalid.
   if (!Number.isFinite(weeks) || weeks <= 0) weeks = 4;
@@ -81,16 +81,36 @@ function CycleWeekEditor({ weeks = 4, focus = 'Hypertrophy', onAssignmentsChange
       }
     }
     setAssignments(arr);
-     
+
   }, [weeks, focus, initialAssignments]);
 
-  // Only call onAssignmentsChange when assignments actually change
+  /**
+   * Emit assignment changes to parent component.
+   * 
+   * CRITICAL FIX (2025-11-06): Removed onAssignmentsChange from dependency array to prevent
+   * infinite re-render loop. The parent component may recreate the callback on every render,
+   * but we only need to call it when assignments actually change, not when the callback
+   * reference changes. This fixes the "Maximum update depth exceeded" error.
+   * 
+   * @see https://react.dev/reference/react/useEffect#removing-unnecessary-object-dependencies
+   */
   useEffect(() => {
     if (assignments && assignments.length > 0) {
       onAssignmentsChange(assignments);
     }
-  }, [assignments, onAssignmentsChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments]);
 
+  /**
+   * Handle routine/rest/deload selection for a specific day.
+   * 
+   * Updates the assignments array by mapping over it and modifying the matching week/day.
+   * Validates routine_id is a valid UUID (36 characters) before accepting it.
+   * 
+   * @param {number} weekIndex - 1-indexed week number
+   * @param {number} dayIndex - 1-indexed day number (1-7)
+   * @param {string} value - Selected value: 'rest', 'deload', or routine UUID
+   */
   const handleSelect = (weekIndex, dayIndex, value) => {
     setAssignments((prev) => {
       return prev.map((a) => {
@@ -120,7 +140,7 @@ function CycleWeekEditor({ weeks = 4, focus = 'Hypertrophy', onAssignmentsChange
             <div key={w} className="week-card">
               <strong>Week {w} {deloadWeek ? '(Deload week)' : ''}</strong>
               <div className="assignments">
-                {[1,2,3,4,5,6,7].map((d) => {
+                {[1, 2, 3, 4, 5, 6, 7].map((d) => {
                   const idx = assignments.findIndex(a => a.week_index === w && a.day_index === d);
                   const current = idx >= 0 ? assignments[idx] : { type: 'rest', routine_id: null };
                   return (

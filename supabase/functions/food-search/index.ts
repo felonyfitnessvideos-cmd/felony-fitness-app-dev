@@ -21,8 +21,8 @@
  * food, it will be found in the fast local search.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
 
 // Retrieve the OpenAI API key from environment variables.
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -51,18 +51,23 @@ Deno.serve(async (req) => {
     );
 
     // --- Step 1: Search your local database first ---
+    // CRITICAL FIX: Search food_servings directly by food_name (denormalized structure)
+    // The food_servings table contains food_name as a string field, not a foreign key to foods table.
+    // This matches the exercise-search pattern where exercises table has name field directly.
     const { data: localResults, error: localError } = await supabaseAdmin
-      .from('foods')
-      .select('*, food_servings(*)') // Select the food and all its related servings
-      .ilike('name', `%${query}%`)   // Case-insensitive search
-      .limit(5);
+      .from('food_servings')
+      .select('*')
+      .ilike('food_name', `%${query}%`)   // Case-insensitive search on food_name
+      .limit(10);
 
     if (localError) {
+      console.error('Database search error:', localError);
       throw localError;
     }
 
     // If we find good results locally, return them.
-    if (localResults.length > 0) {
+    if (localResults && localResults.length > 0) {
+      console.log(`Found ${localResults.length} local results for "${query}"`);
       return new Response(JSON.stringify({ results: localResults, source: 'local' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -70,40 +75,91 @@ Deno.serve(async (req) => {
     }
 
     // --- Step 2: If no local results, call OpenAI API as a fallback ---
-    const prompt = `Provide nutritional info for "${query}". Give up to 3 common serving sizes. Format as clean, valid JSON like this: {"results": [{"name": string, "serving_description": string, "calories": int, "protein_g": int}]}`;
+    console.log(`No local results found for "${query}", calling OpenAI API...`);
+
+    const prompt = `
+      You are a nutrition database assistant. Provide detailed nutritional information for "${query}".
+      
+      Respond in valid JSON with a "results" array containing up to 3 common serving sizes:
+      {
+        "results": [{
+          "food_name": "Food name (string)",
+          "serving_description": "Serving size (e.g., '1 cup', '100g', '1 medium') (string)",
+          "calories": number,
+          "protein_g": number,
+          "carbs_g": number,
+          "fat_g": number,
+          "fiber_g": number,
+          "sugar_g": number,
+          "sodium_mg": number
+        }]
+      }
+      
+      Example for "chicken breast":
+      {
+        "results": [
+          {
+            "food_name": "Chicken Breast",
+            "serving_description": "4 oz (113g) cooked",
+            "calories": 187,
+            "protein_g": 35,
+            "carbs_g": 0,
+            "fat_g": 4,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "sodium_mg": 84
+          },
+          {
+            "food_name": "Chicken Breast",
+            "serving_description": "1 cup diced (140g) cooked",
+            "calories": 231,
+            "protein_g": 43,
+            "carbs_g": 0,
+            "fat_g": 5,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "sodium_mg": 104
+          }
+        ]
+      }
+    `;
 
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
-            temperature: 0.2 // A low temperature for factual, consistent nutrition data.
-        })
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.1 // Very low temperature for factual, consistent nutrition data.
+      })
     });
 
     if (!aiResponse.ok) {
-        throw new Error(`AI API request failed: ${await aiResponse.text()}`);
+      const errorText = await aiResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`AI API request failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
+    console.log('OpenAI response received');
     const externalResults = JSON.parse(aiData.choices[0].message.content);
 
     // Return the AI-generated results to the client.
     return new Response(JSON.stringify({ ...externalResults, source: 'external' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
     });
 
   } catch (err) {
     // Generic error handler for any failures in the try block.
-    return new Response(JSON.stringify({ error: err.message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
+    console.error('Error in food-search function:', err);
+    return new Response(JSON.stringify({ error: (err as Error)?.message || 'Unknown error' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
     });
   }
 });

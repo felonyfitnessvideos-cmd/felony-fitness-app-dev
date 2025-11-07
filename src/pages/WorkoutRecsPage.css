@@ -81,6 +81,14 @@
 }
 
 /**
+ * Additional styles for the "Generate Again" button in the results view.
+ */
+.regenerate-button {
+  margin: 2rem auto 0 auto; /* Add space above and center horizontally */
+  display: block; /* Make it a block element so margin auto works */
+}
+
+/**
  * A simple loading spinner animation.
  */
 .loading-spinner {

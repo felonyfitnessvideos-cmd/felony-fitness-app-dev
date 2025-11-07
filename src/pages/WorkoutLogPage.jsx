@@ -158,10 +158,22 @@ function WorkoutLogPage() {
         }
       }
 
-      // Step 1: Fetch the routine details first, ensuring exercises are correctly ordered.
+      /**
+       * Step 1: Fetch the routine details first, ensuring exercises are correctly ordered.
+       * 
+       * SCHEMA CHANGE (2025-11-06): Removed muscle_groups table join. The exercises table
+       * now stores muscle information directly in string fields (primary_muscle, 
+       * secondary_muscle, tertiary_muscle) instead of using foreign key relationships.
+       * This simplifies the query and removes dependency on deprecated muscle_groups table.
+       * 
+       * Query structure:
+       * - workout_routines (routine metadata)
+       *   -> routine_exercises (target sets, order)
+       *     -> exercises (all exercise details including muscle fields)
+       */
       const { data: routineData, error: routineError } = await supabase
         .from('workout_routines')
-        .select(`*, routine_exercises(target_sets, exercise_order, exercises(*, muscle_groups!muscle_group_id(name)))`)
+        .select(`*, routine_exercises(target_sets, exercise_order, exercises(*))`)
         .eq('id', currentRoutineId)
         .order('exercise_order', { foreignTable: 'routine_exercises', ascending: true })
         .single();
@@ -173,9 +185,13 @@ function WorkoutLogPage() {
       console.debug('WorkoutLogPage: fetched routineData', routineData);
       if (!routineData.routine_exercises || routineData.routine_exercises.length === 0) {
         try {
+          /**
+           * Fallback query when nested join doesn't work due to RLS or DB configuration.
+           * Updated to match schema changes - no muscle_groups join required.
+           */
           const { data: reData, error: reErr } = await supabase
             .from('routine_exercises')
-            .select('*, exercises(*, muscle_groups!muscle_group_id(name))')
+            .select('*, exercises(*)')
             .eq('routine_id', currentRoutineId)
             .order('exercise_order', { ascending: true });
           console.debug('WorkoutLogPage: fallback routine_exercises result', { reData, reErr });
