@@ -205,12 +205,9 @@ Deno.serve(async (req: Request) => {
         .maybeSingle(),
       supabase
         .from('nutrition_logs')
-        // The schema in some deployments stores `food_servings` as a
-        // separate table and the `nutrition_logs` row holds a
-        // `food_servings_id` reference. Select the log id and the
-        // food_servings_id so we can resolve the actual servings in a
-        // follow-up query. This is robust across both schemas.
-        .select('id, food_servings_id')
+        // CRITICAL: Need quantity_consumed from nutrition_logs (how many servings eaten)
+        // food_servings_id to join food details separately (avoiding RLS issues)
+        .select('id, food_serving_id, quantity_consumed')
         .eq('user_id', userId)
         .gte('created_at', sevenDaysAgo.toISOString()),
       supabase
@@ -235,10 +232,10 @@ Deno.serve(async (req: Request) => {
       // downstream fallbacks will query the `food_servings` table by
       // user/date window.
       if (msg.includes('food_servings') || msg.includes('food_servings_1') || msg.includes('quantity_consumed')) {
-        console.warn('Nutrition logs nested select failed; retrying with id, food_servings_id select');
+        console.warn('Nutrition logs nested select failed; retrying with id, food_serving_id, quantity_consumed select');
         const fallback = await supabase
           .from('nutrition_logs')
-          .select('id, food_servings_id')
+          .select('id, food_serving_id, quantity_consumed')
           .eq('user_id', userId)
           .gte('created_at', sevenDaysAgo.toISOString());
 
@@ -285,40 +282,45 @@ Deno.serve(async (req: Request) => {
         return acc;
       }, {} as Record<string, number>);
     } else {
-      // Pattern 2: separate food_servings table referenced by food_servings_id
-      // Collect all referenced IDs (support single ID or arrays of IDs)
-      const ids = new Set<number | string>();
-      for (const r of rows) {
-        const ref = r?.food_servings_id;
-        if (!ref) continue;
-        if (Array.isArray(ref)) {
-          for (const id of ref) ids.add(id);
-        } else if (typeof ref === 'string' && ref.includes(',')) {
-          // sometimes stored as comma-separated list
-          for (const id of ref.split(',').map(s => s.trim()).filter(Boolean)) ids.add(id);
-        } else {
-          ids.add(ref);
-        }
+      // Pattern 2: separate food_servings table referenced by food_serving_id
+      // Build a map from nutrition_logs for quantity_consumed per food_serving_id
+      const logsByServingId = new Map<any, { quantity_consumed: number, count: number }>();
+      
+      for (const log of rows) {
+        const servingId = (log as any)?.food_serving_id;
+        const qty = Number.isFinite((log as any)?.quantity_consumed) ? (log as any).quantity_consumed : 1;
+        
+        if (!servingId) continue;
+        
+        const existing = logsByServingId.get(servingId) || { quantity_consumed: 0, count: 0 };
+        existing.quantity_consumed += qty;
+        existing.count += 1;
+        logsByServingId.set(servingId, existing);
       }
 
-      const idList = Array.from(ids);
+      const idList = Array.from(logsByServingId.keys());
       if (idList.length > 0) {
-        // Try to fetch referenced food_servings rows by id.
+        // Fetch referenced food_servings rows by id
         const fsRes = await supabase
           .from('food_servings')
-          .select('id, quantity_consumed, quantity, qty, foods(name, category), category, food_name, created_at')
+          .select('id, food_name, category, brand')
           .in('id', idList as any[]);
 
         if (fsRes.error) {
-          // If the direct join fails (schema mismatch), fall back to searching
-          // the `food_servings` table by user and time window below.
-          console.warn('Direct food_servings lookup by id failed, will try time-window fallback:', String(fsRes.error.message || fsRes.error));
+          console.warn('Direct food_servings lookup by id failed:', String(fsRes.error.message || fsRes.error));
         } else if (fsRes.data && fsRes.data.length > 0) {
-          categoryCounts = (fsRes.data || []).reduce((acc: Record<string, number>, s: any) => {
-            // determine category field
-            const category = s?.foods?.category ?? s?.category ?? s?.food?.category ?? s?.food_name ?? 'Uncategorized';
-            const qty = Number.isFinite(s?.quantity_consumed) ? s.quantity_consumed : (Number.isFinite(s?.quantity) ? s.quantity : (Number.isFinite(s?.qty) ? s.qty : 1));
-            acc[category] = (acc[category] ?? 0) + qty;
+          // Now count categories using quantity_consumed from nutrition_logs
+          categoryCounts = (fsRes.data || []).reduce((acc: Record<string, number>, serving: any) => {
+            const servingId = serving.id;
+            const logData = logsByServingId.get(servingId);
+            
+            if (!logData) return acc;
+            
+            // Use category from food_servings, fallback to food_name
+            const category = serving?.category ?? serving?.food_name ?? 'Uncategorized';
+            const totalQty = logData.quantity_consumed;
+            
+            acc[category] = (acc[category] ?? 0) + totalQty;
             return acc;
           }, {} as Record<string, number>);
         }

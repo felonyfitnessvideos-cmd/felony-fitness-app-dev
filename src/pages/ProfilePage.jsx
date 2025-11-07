@@ -471,8 +471,11 @@ function ProfilePage() {
         let heightFeet = '', heightInches = '';
         if (profileData.height_cm) {
           const totalInches = profileData.height_cm / 2.54; // Convert cm to inches
-          heightFeet = Math.floor(totalInches / 12).toString();
-          heightInches = Math.round(totalInches % 12).toString();
+          const totalInchesRounded = Math.round(totalInches);
+          const feetPart = Math.floor(totalInchesRounded / 12);
+          const inchesPart = totalInchesRounded % 12; // This is always 0-11 after rounding first
+          heightFeet = feetPart.toString();
+          heightInches = inchesPart.toString();
         }
 
         setProfile({

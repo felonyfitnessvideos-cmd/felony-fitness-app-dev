@@ -240,8 +240,6 @@ describe('CycleWeekEditor', () => {
                 />
             );
 
-            const initialCallCount = mockOnAssignmentsChange.mock.calls.length;
-
             // Rerender with a new callback reference (this used to cause infinite loop)
             const newCallback = vi.fn();
             rerender(
@@ -254,8 +252,8 @@ describe('CycleWeekEditor', () => {
             // Wait a bit to ensure no infinite loop
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // The callback should not be called excessively
-            expect(mockOnAssignmentsChange.mock.calls.length).toBeLessThan(initialCallCount + 5);
+            // The NEW callback should not be called excessively (test the actual new callback now used)
+            expect(newCallback.mock.calls.length).toBeLessThan(5);
         });
 
         it('should only call onAssignmentsChange when assignments actually change', async () => {

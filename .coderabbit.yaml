@@ -9,13 +9,13 @@ reviews:
     - "!**/node_modules/**"
     - "!**/dist/**"
     - "!**/*.md" # Ignores markdown files
-  
+
   # Profile for code review behavior
   profile: "chill"
-  
+
   # Request changes for critical issues
   request_changes_workflow: true
-  
+
   # Knowledge base with custom instructions for this project
   knowledge_base:
     - |

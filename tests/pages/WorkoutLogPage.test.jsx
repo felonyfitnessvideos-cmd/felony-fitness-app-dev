@@ -207,7 +207,7 @@ const renderWorkoutLogPage = () => {
 
 describe('WorkoutLogPage', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
     });
 
     describe('Rendering', () => {

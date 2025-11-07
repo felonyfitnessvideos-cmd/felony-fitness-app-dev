@@ -25,7 +25,7 @@
   /* This is correct: centers the whole block */
   width: 100%;
   max-width: 450px;
-  margin: 2rem auto 0 auto; 
+  margin: 2rem auto 0 auto;
   text-align: center;
 }
 
@@ -35,7 +35,7 @@
 .intro-view {
   display: flex;
   flex-direction: column;
-  align-items: center; 
+  align-items: center;
   /* Removed gap to use explicit margins for better control */
   padding: 2rem;
   background-color: #2d3748;
@@ -63,7 +63,8 @@
 /**
  * Shared styles for the main call-to-action buttons.
  */
-.intro-view button, .regenerate-button {
+.intro-view button,
+.regenerate-button {
   background-color: #f97316;
   color: white;
   padding: 0.75rem 1.5rem;
@@ -76,8 +77,9 @@
   max-width: 350px; /* This is correct */
 }
 
-.intro-view button:hover, .regenerate-button:hover {
-  background-color: #dd6b20; 
+.intro-view button:hover,
+.regenerate-button:hover {
+  background-color: #dd6b20;
 }
 
 /**
@@ -102,8 +104,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /**
@@ -175,10 +181,6 @@
   margin: 0.25rem 0;
 }
 
-.regenerate-button {
-  /* This is now in the shared rule above */
-}
-
 /**
  * A small, styled box for displaying tips to the user.
  */
@@ -186,17 +188,17 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: rgba(249, 115, 22, 0.1); 
+  background-color: rgba(249, 115, 22, 0.1);
   color: #f97316;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
-  text-align: left; 
-  
+  text-align: left;
+
   /* Added margins for spacing and max-width to match other elements */
   margin-bottom: 1.5rem;
-  width: 100%; 
-  max-width: 350px; 
+  width: 100%;
+  max-width: 350px;
   box-sizing: border-box; /* Include padding in the width calculation */
 }
