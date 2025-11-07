@@ -245,7 +245,7 @@ async function findSimilarFoods(supabase: any, foodName: string) {
     .limit(3);
 
   // Only return if we find an exact match (case insensitive)
-  const exactMatches = (data || []).filter(food =>
+  const exactMatches = (data || []).filter((food: any) =>
     food.name.toLowerCase() === foodName.toLowerCase()
   );
 
@@ -255,7 +255,7 @@ async function findSimilarFoods(supabase: any, foodName: string) {
 /**
  * Main handler with comprehensive guardrails
  */
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -325,7 +325,7 @@ Deno.serve(async (req) => {
 
     // Rank results by relevance
     const rankedResults = (searchResults || [])
-      .map(food => {
+      .map((food: any) => {
         const name = (food.food_name || food.name || '').toLowerCase();
         let score = 0;
 
@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
         if (name.startsWith(scoringQuery)) score += 50;
 
         // Contains all search terms gets good score
-        if (scoringTerms.every(term => name.includes(term))) score += 30;
+        if (scoringTerms.every((term: string) => name.includes(term))) score += 30;
 
         // Contains primary term gets base score
         const primaryScoringTerm = scoringTerms[0];
@@ -352,8 +352,8 @@ Deno.serve(async (req) => {
 
         return { ...food, relevanceScore: score };
       })
-      .filter(food => food.relevanceScore > 0)
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .filter((food: any) => food.relevanceScore > 0)
+      .sort((a: any, b: any) => b.relevanceScore - a.relevanceScore)
       .slice(0, 5);
 
     if (rankedResults.length > 0) {

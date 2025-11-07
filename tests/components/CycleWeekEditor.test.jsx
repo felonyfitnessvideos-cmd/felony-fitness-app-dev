@@ -278,10 +278,17 @@ describe('CycleWeekEditor', () => {
 
     describe('Edge Cases', () => {
         it('should handle missing user gracefully', () => {
+            // Temporarily set user to null for this test
+            const originalUser = mockAuthContext.user;
+            mockAuthContext.user = null;
+
             const { unmount } = render(<CycleWeekEditor weeks={1} onAssignmentsChange={mockOnAssignmentsChange} />);
 
             expect(screen.getByText('Week 1')).toBeInTheDocument();
             unmount();
+
+            // Restore user after test
+            mockAuthContext.user = originalUser;
         });
 
         it('should handle database error when loading routines', async () => {

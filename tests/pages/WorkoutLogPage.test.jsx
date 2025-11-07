@@ -15,10 +15,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthContext } from '../../src/contexts/AuthContext';
 import WorkoutLogPage from '../../src/pages/WorkoutLogPage';
 
-// Mock user for AuthContext
+// Mock the AuthContext
 const mockUser = {
     id: 'test-user-123',
     email: 'test@example.com'
@@ -28,6 +27,10 @@ const mockAuthContext = {
     user: mockUser,
     loading: false
 };
+
+vi.mock('../../src/AuthContext.jsx', () => ({
+    useAuth: () => mockAuthContext
+}));
 
 // Mock workout session data
 const mockWorkoutSession = {
@@ -188,8 +191,8 @@ const mockSupabase = {
 };
 
 // Mock Supabase module
-vi.mock('../../src/lib/supabaseClient', () => ({
-    default: mockSupabase
+vi.mock('../../src/supabaseClient.js', () => ({
+    supabase: mockSupabase
 }));
 
 /**
@@ -198,9 +201,7 @@ vi.mock('../../src/lib/supabaseClient', () => ({
 const renderWorkoutLogPage = () => {
     return render(
         <BrowserRouter>
-            <AuthContext.Provider value={mockAuthContext}>
-                <WorkoutLogPage />
-            </AuthContext.Provider>
+            <WorkoutLogPage />
         </BrowserRouter>
     );
 };
@@ -321,20 +322,20 @@ describe('WorkoutLogPage', () => {
 
             // Find weight input and update it
             const weightInputs = screen.getAllByLabelText(/weight/i);
-            if (weightInputs.length > 0) {
-                await user.clear(weightInputs[0]);
-                await user.type(weightInputs[0], '200');
+            expect(weightInputs.length).toBeGreaterThan(0);
+            
+            await user.clear(weightInputs[0]);
+            await user.type(weightInputs[0], '200');
 
-                // Verify RPC call was made on blur or save
-                await waitFor(() => {
-                    expect(mockSupabase.rpc).toHaveBeenCalledWith(
-                        'save-workout-set',
-                        expect.objectContaining({
-                            p_weight: 200
-                        })
-                    );
-                });
-            }
+            // Verify RPC call was made on blur or save
+            await waitFor(() => {
+                expect(mockSupabase.rpc).toHaveBeenCalledWith(
+                    'save-workout-set',
+                    expect.objectContaining({
+                        p_weight: 200
+                    })
+                );
+            });
         });
 
         it('should allow deleting a set', async () => {
@@ -347,17 +348,17 @@ describe('WorkoutLogPage', () => {
 
             // Find and click delete button
             const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
-            if (deleteButtons.length > 0) {
-                await user.click(deleteButtons[0]);
+            expect(deleteButtons.length).toBeGreaterThan(0);
+            
+            await user.click(deleteButtons[0]);
 
-                // Verify RPC call was made
-                await waitFor(() => {
-                    expect(mockSupabase.rpc).toHaveBeenCalledWith(
-                        'delete-workout-set',
-                        expect.any(Object)
-                    );
-                });
-            }
+            // Verify RPC call was made
+            await waitFor(() => {
+                expect(mockSupabase.rpc).toHaveBeenCalledWith(
+                    'delete-workout-set',
+                    expect.any(Object)
+                );
+            });
         });
     });
 
@@ -476,7 +477,14 @@ describe('WorkoutLogPage', () => {
             // Verify session status update
             await waitFor(() => {
                 expect(mockSupabase.from).toHaveBeenCalledWith('workout_sessions');
-                expect(mockSupabase.from().update).toHaveBeenCalled();
+                
+                // Check that one of the chainable instances had update called
+                const fromResults = mockSupabase.from.mock.results;
+                const hasUpdateCall = fromResults.some(result => {
+                    const chainInstance = result.value;
+                    return chainInstance && chainInstance.update && chainInstance.update.mock && chainInstance.update.mock.calls.length > 0;
+                });
+                expect(hasUpdateCall).toBe(true);
             });
         });
 
@@ -580,10 +588,17 @@ describe('WorkoutLogPage', () => {
             });
 
             // Verify select query uses exercises(*) not muscle_groups join
-            const selectCalls = mockSupabase.from().select.mock.calls;
-            const hasDeprecatedJoin = selectCalls.some(call =>
-                call[0]?.includes('muscle_groups')
-            );
+            // Check the actual mock results from the from() calls
+            const fromResults = mockSupabase.from.mock.results;
+            const hasDeprecatedJoin = fromResults.some(result => {
+                const chainInstance = result.value;
+                if (chainInstance && chainInstance.select && chainInstance.select.mock) {
+                    return chainInstance.select.mock.calls.some(call =>
+                        call[0]?.includes('muscle_groups')
+                    );
+                }
+                return false;
+            });
             expect(hasDeprecatedJoin).toBe(false);
         });
 

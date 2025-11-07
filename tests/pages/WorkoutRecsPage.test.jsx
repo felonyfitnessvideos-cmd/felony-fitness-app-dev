@@ -15,10 +15,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthContext } from '../../src/contexts/AuthContext';
 import WorkoutRecsPage from '../../src/pages/WorkoutRecsPage';
 
-// Mock user for AuthContext
+// Mock the AuthContext
 const mockUser = {
     id: 'test-user-123',
     email: 'test@example.com'
@@ -28,6 +27,10 @@ const mockAuthContext = {
     user: mockUser,
     loading: false
 };
+
+vi.mock('../../src/AuthContext.jsx', () => ({
+    useAuth: () => mockAuthContext
+}));
 
 // Mock auth session
 const mockSession = {
@@ -96,9 +99,7 @@ vi.mock('../../src/supabaseClient', () => ({
 const renderWorkoutRecsPage = () => {
     return render(
         <BrowserRouter>
-            <AuthContext.Provider value={mockAuthContext}>
-                <WorkoutRecsPage />
-            </AuthContext.Provider>
+            <WorkoutRecsPage />
         </BrowserRouter>
     );
 };
@@ -137,18 +138,21 @@ describe('WorkoutRecsPage', () => {
         });
 
         it('should disable button when no user is authenticated', () => {
-            const noUserContext = { user: null, loading: false };
+            // Temporarily set user to null for this test
+            const originalUser = mockAuthContext.user;
+            mockAuthContext.user = null;
 
             render(
                 <BrowserRouter>
-                    <AuthContext.Provider value={noUserContext}>
-                        <WorkoutRecsPage />
-                    </AuthContext.Provider>
+                    <WorkoutRecsPage />
                 </BrowserRouter>
             );
 
             const button = screen.getByRole('button', { name: /Generate My Recommendations/i });
             expect(button).toBeDisabled();
+
+            // Restore user after test
+            mockAuthContext.user = originalUser;
         });
     });
 

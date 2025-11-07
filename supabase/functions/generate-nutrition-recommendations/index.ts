@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
       supabase
         .from('nutrition_logs')
         // CRITICAL: Need quantity_consumed from nutrition_logs (how many servings eaten)
-        // food_servings_id to join food details separately (avoiding RLS issues)
+        // food_serving_id to join food details separately (avoiding RLS issues)
         .select('id, food_serving_id, quantity_consumed')
         .eq('user_id', userId)
         .gte('created_at', sevenDaysAgo.toISOString()),

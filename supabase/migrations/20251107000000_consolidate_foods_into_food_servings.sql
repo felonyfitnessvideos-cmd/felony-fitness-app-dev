@@ -77,81 +77,58 @@ SET DEFAULT 0.00,
     ALTER COLUMN selenium_mcg
 SET DEFAULT 0.00;
 -- Update existing NULL values to 0 (data cleanup)
+-- Consolidated UPDATE for better performance (single table scan instead of 19)
 UPDATE food_servings
-SET calories = 0.00
-WHERE calories IS NULL;
-UPDATE food_servings
-SET protein_g = 0.00
-WHERE protein_g IS NULL;
-UPDATE food_servings
-SET carbs_g = 0.00
-WHERE carbs_g IS NULL;
-UPDATE food_servings
-SET fat_g = 0.00
-WHERE fat_g IS NULL;
-UPDATE food_servings
-SET fiber_g = 0.00
-WHERE fiber_g IS NULL;
-UPDATE food_servings
-SET sugar_g = 0.00
-WHERE sugar_g IS NULL;
-UPDATE food_servings
-SET sodium_mg = 0.00
-WHERE sodium_mg IS NULL;
-UPDATE food_servings
-SET calcium_mg = 0.00
-WHERE calcium_mg IS NULL;
-UPDATE food_servings
-SET iron_mg = 0.00
-WHERE iron_mg IS NULL;
-UPDATE food_servings
-SET vitamin_c_mg = 0.00
-WHERE vitamin_c_mg IS NULL;
-UPDATE food_servings
-SET potassium_mg = 0.00
-WHERE potassium_mg IS NULL;
-UPDATE food_servings
-SET vitamin_a_mcg = 0.00
-WHERE vitamin_a_mcg IS NULL;
-UPDATE food_servings
-SET vitamin_e_mg = 0.00
-WHERE vitamin_e_mg IS NULL;
-UPDATE food_servings
-SET vitamin_k_mcg = 0.00
-WHERE vitamin_k_mcg IS NULL;
-UPDATE food_servings
-SET thiamin_mg = 0.00
-WHERE thiamin_mg IS NULL;
-UPDATE food_servings
-SET riboflavin_mg = 0.00
-WHERE riboflavin_mg IS NULL;
-UPDATE food_servings
-SET niacin_mg = 0.00
-WHERE niacin_mg IS NULL;
-UPDATE food_servings
-SET vitamin_b6_mg = 0.00
-WHERE vitamin_b6_mg IS NULL;
-UPDATE food_servings
-SET folate_mcg = 0.00
-WHERE folate_mcg IS NULL;
-UPDATE food_servings
-SET vitamin_b12_mcg = 0.00
-WHERE vitamin_b12_mcg IS NULL;
-UPDATE food_servings
-SET magnesium_mg = 0.00
-WHERE magnesium_mg IS NULL;
-UPDATE food_servings
-SET phosphorus_mg = 0.00
-WHERE phosphorus_mg IS NULL;
-UPDATE food_servings
-SET zinc_mg = 0.00
-WHERE zinc_mg IS NULL;
-UPDATE food_servings
-SET copper_mg = 0.00
-WHERE copper_mg IS NULL;
-UPDATE food_servings
-SET selenium_mcg = 0.00
-WHERE selenium_mcg IS NULL;
+SET calories = COALESCE(calories, 0.00),
+    protein_g = COALESCE(protein_g, 0.00),
+    carbs_g = COALESCE(carbs_g, 0.00),
+    fat_g = COALESCE(fat_g, 0.00),
+    fiber_g = COALESCE(fiber_g, 0.00),
+    sugar_g = COALESCE(sugar_g, 0.00),
+    sodium_mg = COALESCE(sodium_mg, 0.00),
+    calcium_mg = COALESCE(calcium_mg, 0.00),
+    iron_mg = COALESCE(iron_mg, 0.00),
+    vitamin_c_mg = COALESCE(vitamin_c_mg, 0.00),
+    potassium_mg = COALESCE(potassium_mg, 0.00),
+    vitamin_a_mcg = COALESCE(vitamin_a_mcg, 0.00),
+    vitamin_e_mg = COALESCE(vitamin_e_mg, 0.00),
+    vitamin_k_mcg = COALESCE(vitamin_k_mcg, 0.00),
+    thiamin_mg = COALESCE(thiamin_mg, 0.00),
+    riboflavin_mg = COALESCE(riboflavin_mg, 0.00),
+    niacin_mg = COALESCE(niacin_mg, 0.00),
+    vitamin_b6_mg = COALESCE(vitamin_b6_mg, 0.00),
+    folate_mcg = COALESCE(folate_mcg, 0.00),
+    vitamin_b12_mcg = COALESCE(vitamin_b12_mcg, 0.00),
+    magnesium_mg = COALESCE(magnesium_mg, 0.00),
+    phosphorus_mg = COALESCE(phosphorus_mg, 0.00),
+    zinc_mg = COALESCE(zinc_mg, 0.00),
+    copper_mg = COALESCE(copper_mg, 0.00),
+    selenium_mcg = COALESCE(selenium_mcg, 0.00)
+WHERE calories IS NULL
+    OR protein_g IS NULL
+    OR carbs_g IS NULL
+    OR fat_g IS NULL
+    OR fiber_g IS NULL
+    OR sugar_g IS NULL
+    OR sodium_mg IS NULL
+    OR calcium_mg IS NULL
+    OR iron_mg IS NULL
+    OR vitamin_c_mg IS NULL
+    OR potassium_mg IS NULL
+    OR vitamin_a_mcg IS NULL
+    OR vitamin_e_mg IS NULL
+    OR vitamin_k_mcg IS NULL
+    OR thiamin_mg IS NULL
+    OR riboflavin_mg IS NULL
+    OR niacin_mg IS NULL
+    OR vitamin_b6_mg IS NULL
+    OR folate_mcg IS NULL
+    OR vitamin_b12_mcg IS NULL
+    OR magnesium_mg IS NULL
+    OR phosphorus_mg IS NULL
+    OR zinc_mg IS NULL
+    OR copper_mg IS NULL
+    OR selenium_mcg IS NULL;
 -- Make nutrition columns NOT NULL after setting defaults
 ALTER TABLE food_servings
 ALTER COLUMN calories
@@ -167,6 +144,42 @@ SET NOT NULL,
     ALTER COLUMN sugar_g
 SET NOT NULL,
     ALTER COLUMN sodium_mg
+SET NOT NULL,
+    ALTER COLUMN calcium_mg
+SET NOT NULL,
+    ALTER COLUMN iron_mg
+SET NOT NULL,
+    ALTER COLUMN vitamin_c_mg
+SET NOT NULL,
+    ALTER COLUMN potassium_mg
+SET NOT NULL,
+    ALTER COLUMN vitamin_a_mcg
+SET NOT NULL,
+    ALTER COLUMN vitamin_e_mg
+SET NOT NULL,
+    ALTER COLUMN vitamin_k_mcg
+SET NOT NULL,
+    ALTER COLUMN thiamin_mg
+SET NOT NULL,
+    ALTER COLUMN riboflavin_mg
+SET NOT NULL,
+    ALTER COLUMN niacin_mg
+SET NOT NULL,
+    ALTER COLUMN vitamin_b6_mg
+SET NOT NULL,
+    ALTER COLUMN folate_mcg
+SET NOT NULL,
+    ALTER COLUMN vitamin_b12_mcg
+SET NOT NULL,
+    ALTER COLUMN magnesium_mg
+SET NOT NULL,
+    ALTER COLUMN phosphorus_mg
+SET NOT NULL,
+    ALTER COLUMN zinc_mg
+SET NOT NULL,
+    ALTER COLUMN copper_mg
+SET NOT NULL,
+    ALTER COLUMN selenium_mcg
 SET NOT NULL;
 -- Create index on category for faster filtering
 CREATE INDEX IF NOT EXISTS idx_food_servings_category ON food_servings(category);
