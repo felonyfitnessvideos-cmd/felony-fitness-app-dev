@@ -12,14 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import RestTimerModal from '../../src/components/RestTimerModal.jsx';
 
 describe('RestTimerModal', () => {
-    let mockOnComplete;
     let mockOnClose;
-    let mockOnUpdate;
 
     beforeEach(() => {
-        mockOnComplete = vi.fn();
         mockOnClose = vi.fn();
-        mockOnUpdate = vi.fn();
         vi.useFakeTimers();
     });
 
@@ -34,7 +30,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={90}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -47,7 +42,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={125}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -60,7 +54,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={false}
                     initialDuration={90}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -75,7 +68,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={10}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -96,7 +88,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={2}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -114,7 +105,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={2}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -134,9 +124,7 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={60}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
-                    onUpdate={mockOnUpdate}
                 />
             );
 
@@ -154,9 +142,7 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={90}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
-                    onUpdate={mockOnUpdate}
                 />
             );
 
@@ -168,23 +154,20 @@ describe('RestTimerModal', () => {
             });
         });
 
-        it('should call onUpdate when time is adjusted', async () => {
+        it('should adjust time correctly', async () => {
             const user = userEvent.setup({ delay: null });
             render(
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={60}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
-                    onUpdate={mockOnUpdate}
                 />
             );
 
             const addButton = screen.getByRole('button', { name: /increase/i });
             await user.click(addButton);
 
-            // Timer adjusts but onUpdate is not a prop that exists in this component
-            // The component doesn't call onUpdate, so we should test the time change instead
+            // Verify time changes after adjustment
             await waitFor(() => {
                 expect(screen.getByText(/1:10/i)).toBeInTheDocument();
             });
@@ -197,7 +180,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={0}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -210,7 +192,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={-10}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -225,7 +206,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={5}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -249,7 +229,6 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={60}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
                 />
             );
@@ -266,9 +245,7 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={60}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
-                    onUpdate={mockOnUpdate}
                 />
             );
 
@@ -288,9 +265,7 @@ describe('RestTimerModal', () => {
                 <RestTimerModal
                     isOpen={true}
                     initialDuration={60}
-                    onComplete={mockOnComplete}
                     onClose={mockOnClose}
-                    onUpdate={mockOnUpdate}
                 />
             );
 
