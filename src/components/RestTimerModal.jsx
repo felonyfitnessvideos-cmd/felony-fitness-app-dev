@@ -30,9 +30,9 @@
  *   onFinishWorkout={() => navigateToWorkoutLog()}
  * />
  */
-import React, { useState, useEffect } from 'react';
+import { Minus, Plus, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import Modal from 'react-modal';
-import { Plus, Minus, X } from 'lucide-react';
 import './RestTimerModal.css';
 
 /**
@@ -140,12 +140,13 @@ function RestTimerModal({ isOpen, onClose, initialDuration = 60, isWorkoutComple
       contentLabel="Rest Timer"
       overlayClassName="rest-modal-overlay"
       className="rest-modal-content"
+      data-testid="modal"
     >
       <div className="rest-timer-container">
         <div className="timer-header">
           {/* Display different titles based on whether the workout is complete. */}
           <h3>{isWorkoutComplete ? 'WORKOUT COMPLETE' : 'REST'}</h3>
-          <button onClick={onClose} className="close-btn"><X size={24} /></button>
+          <button onClick={onClose} className="close-btn" aria-label="Close timer"><X size={24} /></button>
         </div>
         
         <div className="timer-circle">
@@ -165,9 +166,9 @@ function RestTimerModal({ isOpen, onClose, initialDuration = 60, isWorkoutComple
           </div>
         ) : (
           <div className="timer-controls">
-            <button onClick={() => adjustTime(-10)} className="adjust-btn"><Minus size={20} /> 10s</button>
+            <button onClick={() => adjustTime(-10)} className="adjust-btn" aria-label="Decrease time by 10 seconds"><Minus size={20} /> 10s</button>
             <button onClick={onClose} className="skip-btn">Skip</button>
-            <button onClick={() => adjustTime(10)} className="adjust-btn"><Plus size={20} /> 10s</button>
+            <button onClick={() => adjustTime(10)} className="adjust-btn" aria-label="Increase time by 10 seconds"><Plus size={20} /> 10s</button>
           </div>
         )}
       </div>
