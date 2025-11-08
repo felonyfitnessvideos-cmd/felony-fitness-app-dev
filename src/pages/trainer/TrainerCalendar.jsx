@@ -204,6 +204,8 @@ const TrainerCalendar = memo(() => {
       });
       loadEvents('primary', startOfWeek, endDate);
     }
+    // getWeekDates is stable from useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, currentWeek, loadEvents]);
 
   // Convert Google Calendar events to appointment format
@@ -606,6 +608,8 @@ const TrainerCalendar = memo(() => {
       // Show error to user (could be replaced with proper error toast)
       alert(`Failed to create test appointment: ${errorMsg}`);
     }
+    // getWeekDates and loadEvents are stable from useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, createEvent, setCurrentWeek]);
 
   // Memoized calculations for performance

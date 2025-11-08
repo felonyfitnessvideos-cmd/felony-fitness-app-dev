@@ -53,6 +53,8 @@ const UserRoleManager = () => {
         if (user) {
             loadUserData();
         }
+        // loadUserData changes on every render, so we can't include it safely
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     /**

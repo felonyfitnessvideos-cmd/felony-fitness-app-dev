@@ -40,6 +40,8 @@ const RoleSystemTest = () => {
         if (user) {
             loadCurrentRoles();
         }
+        // loadCurrentRoles changes on every render, so we can't include it safely
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const runFullTest = async () => {

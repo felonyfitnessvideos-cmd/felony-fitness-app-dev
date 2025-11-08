@@ -212,6 +212,8 @@ const ProgramDetailPage = () => {
     if (programId) {
       fetchProgramData();
     }
+    // fetchProgramData changes on every render, so we can't include it safely
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId]);
 
   if (loading) {

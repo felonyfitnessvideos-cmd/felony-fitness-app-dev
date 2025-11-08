@@ -20,6 +20,8 @@ const RelationshipCleanup = () => {
     if (user) {
       loadCurrentData();
     }
+    // loadCurrentData changes on every render, so we can't include it safely
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const addResult = (message, isSuccess = true) => {

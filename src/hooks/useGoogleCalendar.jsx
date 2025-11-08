@@ -30,7 +30,7 @@
  * }
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import googleCalendarService from '../services/googleCalendar.js';
 import { getGoogleCalendarConfig, isGoogleCalendarConfigured } from '../services/googleCalendarConfig.js';
 
@@ -169,7 +169,7 @@ export default function useGoogleCalendar() {
       console.error('Failed to check Google Calendar configuration:', error);
       return false;
     }
-  }, [config]);
+  }, []);
 
   /**
    * Initialize Google Calendar API
@@ -253,7 +253,7 @@ export default function useGoogleCalendar() {
       // Clear the initialization in progress flag
       initializationInProgress.current = false;
     }
-  }, [configuredStatus, config.apiKey, config.clientId]);
+  }, [configuredStatus, config.apiKey, config.clientId, isInitialized]);
 
   /**
    * Load user's calendars

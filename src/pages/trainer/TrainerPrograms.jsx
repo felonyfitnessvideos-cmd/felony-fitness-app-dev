@@ -71,6 +71,8 @@ const ProgramMuscleMap = ({ program, routines = [] }) => {
 
   useEffect(() => {
     generateProgramHeatmap();
+    // generateProgramHeatmap changes on every render, so we can't include it safely
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [program, routines]);
 
   const generateProgramHeatmap = async () => {
@@ -248,6 +250,8 @@ const ProgramConfigModal = ({ program, onClose, user }) => {
     if (program) {
       loadProgramData();
     }
+    // loadProgramData changes on every render, so we can't include it safely
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [program]);
 
   const loadProgramData = async () => {
