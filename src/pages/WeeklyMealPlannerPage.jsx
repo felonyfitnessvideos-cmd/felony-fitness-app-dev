@@ -1,8 +1,9 @@
-import { Calendar, ChefHat, Plus, ShoppingCart, Target, Trash2, X } from 'lucide-react';
+import { Calendar, ChefHat, Copy, Plus, Share2, ShoppingCart, Target, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import MealBuilder from '../components/MealBuilder';
 import { DAYS_OF_WEEK, getWeekDates, MEAL_TYPES } from '../constants/mealPlannerConstants';
 import { supabase } from '../supabaseClient';
+import { analyzeWeeklyNutrition } from '../utils/nutritionRecommendations';
 import './WeeklyMealPlannerPage.css';
 
 /**
@@ -50,7 +51,14 @@ const WeeklyMealPlannerPage = () => {
   /** @type {[boolean, Function]} Controls meal selector modal visibility */
   const [showMealSelector, setShowMealSelector] = useState(false);
 
+  /** @type {[boolean, Function]} Controls shopping list modal visibility */
+  const [showShoppingList, setShowShoppingList] = useState(false);
 
+  /** @type {[boolean, Function]} Controls recommendations modal visibility */
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
+  /** @type {[Object|null, Function]} Nutrition analysis and recommendations */
+  const [nutritionAnalysis, setNutritionAnalysis] = useState(null);
 
   /** @type {[Object, Function]} Calculated nutrition totals by day */
   const [weeklyNutrition, setWeeklyNutrition] = useState({});
@@ -92,11 +100,8 @@ const WeeklyMealPlannerPage = () => {
         });
       }
 
-      // Load meal plans
-      await loadMealPlans();
-
-      // Load user meals
-      await loadUserMeals();
+      // Note: Meal plans and user meals are loaded in separate useEffects
+      // to avoid circular dependencies with useCallback
     } catch (error) {
       if (import.meta.env?.DEV) {
 
@@ -105,7 +110,7 @@ const WeeklyMealPlannerPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadMealPlans, loadUserMeals]);
+  }, []);
 
   /**
    * Load plan entries for the current week and active plan
@@ -121,7 +126,7 @@ const WeeklyMealPlannerPage = () => {
       const endDate = currentWeek[6].toISOString().split('T')[0];
 
       const { data, error } = await supabase
-        .from('meal_plan_entries')
+        .from('weekly_meal_plan_entries')
         .select(`
           *,
           meals (
@@ -131,6 +136,10 @@ const WeeklyMealPlannerPage = () => {
             meal_foods (
               quantity,
               food_servings (
+                id,
+                food_name,
+                serving_description,
+                category,
                 calories,
                 protein_g,
                 carbs_g,
@@ -139,7 +148,7 @@ const WeeklyMealPlannerPage = () => {
             )
           )
         `)
-        .eq('weekly_meal_plan_id', activePlan.id)
+        .eq('plan_id', activePlan.id)
         .gte('plan_date', startDate)
         .lte('plan_date', endDate);
 
@@ -193,22 +202,6 @@ const WeeklyMealPlannerPage = () => {
     setWeeklyNutrition(dailyNutrition);
   }, [planEntries, currentWeek]);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  useEffect(() => {
-    loadPlanEntries();
-  }, [loadPlanEntries]);
-
-  useEffect(() => {
-    if (planEntries.length > 0) {
-      calculateWeeklyNutrition();
-    }
-  }, [calculateWeeklyNutrition, planEntries]);
-
-
-
   /**
    * Load initial data required for the meal planner
    * Fetches nutrition goals, meal plans, and user meals
@@ -258,8 +251,8 @@ const WeeklyMealPlannerPage = () => {
       if (active) {
         setActivePlan(active);
       } else if (data.length > 0) {
-        // Make the first plan active if none are active
-        await setActiveMealPlan(data[0].id);
+        // Make the first plan active if none are active (just set it locally, don't call Edge Function during init)
+        setActivePlan(data[0]);
       }
     } catch (error) {
       if (import.meta.env?.DEV) {
@@ -267,7 +260,7 @@ const WeeklyMealPlannerPage = () => {
         console.warn('WeeklyMealPlannerPage - Error loading meal plans:', error);
       }
     }
-  }, [setActiveMealPlan]);
+  }, []); // No dependencies - avoiding circular dependency with setActiveMealPlan
 
   /**
    * Load user's saved meals for meal selection in planner
@@ -301,7 +294,6 @@ const WeeklyMealPlannerPage = () => {
         .select(`
           is_favorite,
           custom_name,
-          notes,
           meals (
             *,
             meal_foods (
@@ -315,8 +307,7 @@ const WeeklyMealPlannerPage = () => {
             )
           )
         `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
 
       if (userMealsError) throw userMealsError;
 
@@ -325,8 +316,7 @@ const WeeklyMealPlannerPage = () => {
         ...um.meals,
         user_meals: [{
           is_favorite: um.is_favorite,
-          custom_name: um.custom_name,
-          notes: um.notes
+          custom_name: um.custom_name
         }]
       }));
 
@@ -352,6 +342,33 @@ const WeeklyMealPlannerPage = () => {
       setUserMeals([]); // Ensure we set empty array on error
     }
   }, []);
+
+  // Load initial data on component mount
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Load meal plans after initial data
+  useEffect(() => {
+    loadMealPlans();
+  }, [loadMealPlans]);
+
+  // Load user meals after initial data
+  useEffect(() => {
+    loadUserMeals();
+  }, [loadUserMeals]);
+
+  // Load plan entries when active plan or week changes
+  useEffect(() => {
+    if (activePlan) {
+      loadPlanEntries();
+    }
+  }, [activePlan, currentWeek, loadPlanEntries]);
+
+  // Recalculate nutrition totals when plan entries change
+  useEffect(() => {
+    calculateWeeklyNutrition();
+  }, [planEntries, calculateWeeklyNutrition]);
 
   /**
    * Calculate total nutrition values for a meal based on its foods and servings
@@ -382,6 +399,130 @@ const WeeklyMealPlannerPage = () => {
       fat: 0
     });
   };
+
+  /**
+   * Generate shopping list from current week's meal plan
+   * 
+   * Aggregates all ingredients from meals in the active plan for the current week,
+   * combines duplicate food items with summed quantities, and groups by food category.
+   * 
+   * @returns {Object} Shopping list grouped by category with food items and quantities
+   * 
+   * @example
+   * const shoppingList = generateShoppingList();
+   * // Returns: { "Proteins": [{ name: "Chicken Breast", quantity: 3, unit: "servings" }], ... }
+   */
+  const generateShoppingList = useCallback(() => {
+    const ingredientMap = new Map();
+    
+    // Aggregate all ingredients from plan entries
+    planEntries.forEach(entry => {
+      const servings = entry.servings || 1;
+      const mealFoods = entry.meals?.meal_foods || [];
+      
+      mealFoods.forEach(mealFood => {
+        const food = mealFood.food_servings;
+        if (!food) return; // Skip if food_servings is missing
+        
+        const foodId = food.id;
+        const quantity = mealFood.quantity * servings;
+        
+        if (ingredientMap.has(foodId)) {
+          // Add to existing quantity
+          const existing = ingredientMap.get(foodId);
+          existing.quantity += quantity;
+        } else {
+          // Add new ingredient
+          ingredientMap.set(foodId, {
+            id: foodId,
+            name: food.food_name,
+            quantity: quantity,
+            category: food.category || 'Other',
+            serving_description: food.serving_description
+          });
+        }
+      });
+    });
+
+    // Group by category
+    const groupedList = {};
+    ingredientMap.forEach(item => {
+      const category = item.category || 'Other';
+      if (!groupedList[category]) {
+        groupedList[category] = [];
+      }
+      groupedList[category].push(item);
+    });
+
+    // Sort categories and items within each category
+    const sortedList = {};
+    Object.keys(groupedList).sort().forEach(category => {
+      sortedList[category] = groupedList[category].sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
+    });
+
+    return sortedList;
+  }, [planEntries]);
+
+  /**
+   * Share shopping list via Web Share API or copy to clipboard
+   * 
+   * Attempts to use the native Web Share API (works on mobile and some desktop browsers).
+   * Falls back to copying the list to clipboard if Web Share is not available.
+   * 
+   * @async
+   * @returns {Promise<void>}
+   * 
+   * @description
+   * Formats the shopping list as plain text with categories and items, then:
+   * - Uses navigator.share() if available (mobile-friendly)
+   * - Falls back to clipboard copy with success message
+   * - Shows error message if both methods fail
+   * 
+   * @example
+   * await shareShoppingList();
+   * // Mobile: Opens native share sheet
+   * // Desktop: Copies to clipboard
+   */
+  const shareShoppingList = useCallback(async () => {
+    const shoppingList = generateShoppingList();
+    
+    // Format shopping list as text
+    let listText = `Shopping List - Week of ${currentWeek[0].toLocaleDateString()}\n\n`;
+    
+    Object.entries(shoppingList).forEach(([category, items]) => {
+      listText += `${category.toUpperCase()}\n`;
+      items.forEach(item => {
+        const qty = Math.round(item.quantity * 10) / 10;
+        listText += `  • ${item.name} - ${qty}× ${item.serving_description}\n`;
+      });
+      listText += '\n';
+    });
+    
+    const totalItems = Object.values(shoppingList).reduce((sum, items) => sum + items.length, 0);
+    listText += `Total: ${totalItems} items\n`;
+
+    try {
+      // Try Web Share API first (works on mobile)
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Shopping List',
+          text: listText
+        });
+      } else {
+        // Fallback to clipboard
+        await navigator.clipboard.writeText(listText);
+        alert('Shopping list copied to clipboard!');
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        // AbortError means user cancelled the share dialog, which is fine
+        console.error('Failed to share shopping list:', error);
+        alert('Failed to share shopping list. Please try again.');
+      }
+    }
+  }, [generateShoppingList, currentWeek]);
 
   /**
    * Create a new weekly meal plan for the current week
@@ -435,6 +576,115 @@ const WeeklyMealPlannerPage = () => {
       alert('Error creating meal plan. Please try again.');
     }
   };
+
+  /**
+   * Duplicate last week's meal plan to the current week
+   * 
+   * Copies all meal entries from the previous week (7 days before current week's start)
+   * to the current week's meal plan. This is useful for users following consistent
+   * meal patterns (bulking, cutting, etc.) who want to repeat the same weekly meals.
+   * 
+   * @async
+   * @returns {Promise<void>}
+   * @throws {Error} When no active plan exists or database operations fail
+   * 
+   * @description
+   * Duplication process:
+   * 1. Verify active plan exists for current week
+   * 2. Calculate previous week's date range
+   * 3. Fetch all meal entries from previous week
+   * 4. Create copies with updated dates (same day of week, new week)
+   * 5. Insert all entries in bulk
+   * 6. Reload plan entries to update UI
+   * 
+   * @example
+   * await duplicateLastWeek();
+   * // Copies Monday breakfast from last week to this Monday, etc.
+   */
+  const duplicateLastWeek = async () => {
+    if (!activePlan) {
+      alert('Please create a meal plan first.');
+      return;
+    }
+
+    try {
+      // Calculate last week's date range
+      const lastWeekStart = new Date(currentWeek[0]);
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const lastWeekEnd = new Date(currentWeek[6]);
+      lastWeekEnd.setDate(lastWeekEnd.getDate() - 7);
+
+      const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0];
+      const lastWeekEndStr = lastWeekEnd.toISOString().split('T')[0];
+
+      // Fetch last week's meal entries
+      const { data: lastWeekEntries, error: fetchError } = await supabase
+        .from('weekly_meal_plan_entries')
+        .select('meal_id, plan_date, meal_type, servings, notes')
+        .eq('plan_id', activePlan.id)
+        .gte('plan_date', lastWeekStartStr)
+        .lte('plan_date', lastWeekEndStr);
+
+      if (fetchError) throw fetchError;
+
+      if (!lastWeekEntries || lastWeekEntries.length === 0) {
+        alert('No meals found in the previous week to duplicate.');
+        return;
+      }
+
+      // Create new entries with dates shifted forward by 7 days
+      const newEntries = lastWeekEntries.map(entry => {
+        const oldDate = new Date(entry.plan_date);
+        const newDate = new Date(oldDate);
+        newDate.setDate(newDate.getDate() + 7);
+
+        return {
+          plan_id: activePlan.id,
+          meal_id: entry.meal_id,
+          plan_date: newDate.toISOString().split('T')[0],
+          meal_type: entry.meal_type,
+          servings: entry.servings,
+          notes: entry.notes
+        };
+      });
+
+      // Insert all new entries
+      const { error: insertError } = await supabase
+        .from('weekly_meal_plan_entries')
+        .insert(newEntries);
+
+      if (insertError) throw insertError;
+
+      // Reload plan entries to show duplicated meals
+      await loadPlanEntries();
+      alert(`Successfully duplicated ${newEntries.length} meals from last week!`);
+    } catch (error) {
+      console.error('Error duplicating last week:', error);
+      alert('Error duplicating last week. Please try again.');
+    }
+  };
+
+  /**
+   * Get nutrition recommendations based on weekly intake vs RDA targets
+   * Analyzes deficiencies and provides personalized meal suggestions
+   */
+  const getRecommendations = useCallback(async () => {
+    if (!planEntries || planEntries.length === 0) {
+      alert('Add some meals to your plan first to get recommendations.');
+      return;
+    }
+
+    try {
+      // Analyze weekly nutrition with all available meals for recommendations
+      const analysis = analyzeWeeklyNutrition(planEntries, userMeals);
+      
+      setNutritionAnalysis(analysis);
+      setShowRecommendations(true);
+    } catch (error) {
+      console.error('Error analyzing nutrition:', error);
+      alert('Error generating recommendations. Please try again.');
+    }
+  }, [planEntries, userMeals]);
 
   const setActiveMealPlan = useCallback(async (planId) => {
     try {
@@ -508,9 +758,9 @@ const WeeklyMealPlannerPage = () => {
 
     try {
       const { error } = await supabase
-        .from('meal_plan_entries')
+        .from('weekly_meal_plan_entries')
         .insert([{
-          weekly_meal_plan_id: activePlan.id,
+          plan_id: activePlan.id,
           meal_id: meal.id,
           plan_date: selectedSlot.date,
           meal_type: selectedSlot.mealType,
@@ -531,7 +781,7 @@ const WeeklyMealPlannerPage = () => {
   const removeMealFromSlot = async (entryId) => {
     try {
       const { error } = await supabase
-        .from('meal_plan_entries')
+        .from('weekly_meal_plan_entries')
         .delete()
         .eq('id', entryId);
 
@@ -643,6 +893,13 @@ const WeeklyMealPlannerPage = () => {
             Create Meal
           </button>
 
+          {activePlan && (
+            <button className="duplicate-week-btn" onClick={duplicateLastWeek}>
+              <Copy className="icon" />
+              Duplicate Last Week
+            </button>
+          )}
+
           {!activePlan && (
             <button onClick={createNewMealPlan} className="create-plan-btn">
               <Plus className="icon" />
@@ -660,11 +917,11 @@ const WeeklyMealPlannerPage = () => {
             <p>{activePlan.start_date} to {activePlan.end_date}</p>
           </div>
           <div className="plan-actions">
-            <button className="shopping-list-btn">
+            <button className="shopping-list-btn" onClick={() => setShowShoppingList(true)}>
               <ShoppingCart className="icon" />
               Shopping List
             </button>
-            <button className="recommendations-btn">
+            <button className="recommendations-btn" onClick={getRecommendations}>
               <Target className="icon" />
               Get Recommendations
             </button>
@@ -859,6 +1116,217 @@ const WeeklyMealPlannerPage = () => {
                   ));
                 })()}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shopping List Modal */}
+      {showShoppingList && (
+        <div className="meal-selector-overlay">
+          <div className="meal-selector-modal shopping-list-modal">
+            <div className="meal-selector-header">
+              <h3>
+                <ShoppingCart className="icon" />
+                Shopping List - Week of {currentWeek[0].toLocaleDateString()}
+              </h3>
+              <div className="header-actions">
+                <button 
+                  onClick={shareShoppingList} 
+                  className="share-btn"
+                  title="Share shopping list"
+                >
+                  <Share2 className="icon" />
+                </button>
+                <button 
+                  onClick={() => setShowShoppingList(false)} 
+                  className="close-btn"
+                  title="Close"
+                >
+                  <X className="icon" />
+                </button>
+              </div>
+            </div>
+
+            <div className="meal-selector-content">
+              {(() => {
+                const shoppingList = generateShoppingList();
+                const hasItems = Object.keys(shoppingList).length > 0;
+
+                if (!hasItems) {
+                  return (
+                    <div className="no-meals-found">
+                      <p>No meals planned for this week yet.</p>
+                      <p className="help-text">Add meals to your weekly plan to generate a shopping list.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="shopping-list-content">
+                    {Object.entries(shoppingList).map(([category, items]) => (
+                      <div key={category} className="shopping-category">
+                        <h4 className="category-title">{category}</h4>
+                        <div className="shopping-items">
+                          {items.map(item => (
+                            <div key={item.id} className="shopping-item">
+                              <input 
+                                type="checkbox" 
+                                id={`item-${item.id}`}
+                                className="shopping-checkbox"
+                              />
+                              <label htmlFor={`item-${item.id}`} className="shopping-item-label">
+                                <span className="item-name">{item.name}</span>
+                                <span className="item-quantity">
+                                  {Math.round(item.quantity * 10) / 10}× {item.serving_description}
+                                </span>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="shopping-list-summary">
+                      <p className="item-count">
+                        Total: {Object.values(shoppingList).reduce((sum, items) => sum + items.length, 0)} items
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nutrition Recommendations Modal */}
+      {showRecommendations && nutritionAnalysis && (
+        <div className="meal-selector-overlay">
+          <div className="meal-selector-modal recommendations-modal">
+            <div className="meal-selector-header">
+              <h3>
+                <Target className="icon" />
+                Nutrition Recommendations
+              </h3>
+              <button 
+                onClick={() => setShowRecommendations(false)} 
+                className="close-btn"
+                title="Close"
+              >
+                <X className="icon" />
+              </button>
+            </div>
+
+            <div className="meal-selector-content recommendations-content">
+              {/* Health Score */}
+              <div className="health-score-section">
+                <div className="health-score-circle">
+                  <div className="score-value">{nutritionAnalysis.healthScore}</div>
+                  <div className="score-label">Health Score</div>
+                </div>
+                <p className="score-description">
+                  {nutritionAnalysis.healthScore >= 90 && "Excellent! Your nutrition is well-balanced."}
+                  {nutritionAnalysis.healthScore >= 75 && nutritionAnalysis.healthScore < 90 && "Good nutrition with room for improvement."}
+                  {nutritionAnalysis.healthScore >= 60 && nutritionAnalysis.healthScore < 75 && "Fair nutrition. Consider the recommendations below."}
+                  {nutritionAnalysis.healthScore < 60 && "Your nutrition needs attention. Follow the recommendations."}
+                </p>
+              </div>
+
+              {/* Recommendations */}
+              {nutritionAnalysis.recommendations && nutritionAnalysis.recommendations.length > 0 && (
+                <div className="recommendations-section">
+                  <h4>Personalized Recommendations</h4>
+                  {nutritionAnalysis.recommendations.map((rec, index) => (
+                    <div key={index} className={`recommendation-card ${rec.type}`}>
+                      <div className="recommendation-header">
+                        {rec.type === 'deficiency' && '🔻'}
+                        {rec.type === 'excess' && '⚠️'}
+                        {rec.type === 'success' && '✅'}
+                        <strong>{rec.type === 'deficiency' ? 'Deficiency Detected' : rec.type === 'excess' ? 'Excess Intake' : 'Well Balanced'}</strong>
+                      </div>
+                      <p className="recommendation-text">{rec.suggestion}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Deficiency Details */}
+              {nutritionAnalysis.deficiencies && nutritionAnalysis.deficiencies.length > 0 && (
+                <div className="deficiencies-section">
+                  <h4>Nutrient Analysis</h4>
+                  <div className="deficiency-list">
+                    {nutritionAnalysis.deficiencies.map((def, index) => (
+                      <div key={index} className={`deficiency-item severity-${def.severity}`}>
+                        <div className="deficiency-header">
+                          <span className="nutrient-name">{def.nutrientName}</span>
+                          <span className={`severity-badge ${def.severity}`}>
+                            {def.severity.charAt(0).toUpperCase() + def.severity.slice(1)}
+                          </span>
+                        </div>
+                        <div className="deficiency-details">
+                          <div className="intake-bar">
+                            <div 
+                              className="intake-fill" 
+                              style={{ width: `${Math.min(def.percentOfTarget, 100)}%` }}
+                            />
+                          </div>
+                          <div className="intake-text">
+                            Daily Average: <strong>{def.intake.toFixed(1)} {def.unit}</strong> 
+                            {' '} / Target: {def.target} {def.unit}
+                            {' '}({def.percentOfTarget.toFixed(0)}%)
+                          </div>
+                        </div>
+                        {def.foodSources && def.foodSources.length > 0 && (
+                          <div className="food-sources">
+                            <strong>Top Sources:</strong> {def.foodSources.join(', ')}
+                          </div>
+                        )}
+                        {def.description && (
+                          <p className="nutrient-description">{def.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Daily Averages Summary */}
+              <div className="daily-averages-section">
+                <h4>Daily Nutrition Averages</h4>
+                <div className="averages-grid">
+                  <div className="average-item">
+                    <span className="average-label">Calories</span>
+                    <span className="average-value">{nutritionAnalysis.dailyAverages.calories?.toFixed(0) || 0} kcal</span>
+                  </div>
+                  <div className="average-item">
+                    <span className="average-label">Protein</span>
+                    <span className="average-value">{nutritionAnalysis.dailyAverages.protein_g?.toFixed(1) || 0} g</span>
+                  </div>
+                  <div className="average-item">
+                    <span className="average-label">Carbs</span>
+                    <span className="average-value">{nutritionAnalysis.dailyAverages.carbs_g?.toFixed(1) || 0} g</span>
+                  </div>
+                  <div className="average-item">
+                    <span className="average-label">Fat</span>
+                    <span className="average-value">{nutritionAnalysis.dailyAverages.fat_g?.toFixed(1) || 0} g</span>
+                  </div>
+                  <div className="average-item">
+                    <span className="average-label">Fiber</span>
+                    <span className="average-value">{nutritionAnalysis.dailyAverages.fiber_g?.toFixed(1) || 0} g</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Note about micronutrients */}
+              {nutritionAnalysis.deficiencies && nutritionAnalysis.deficiencies.filter(d => d.nutrient !== 'protein_g' && d.nutrient !== 'carbs_g' && d.nutrient !== 'fat_g' && d.nutrient !== 'fiber_g' && d.nutrient !== 'calories').length === 0 && (
+                <div className="micronutrient-note">
+                  <p>
+                    <strong>Note:</strong> Vitamin and mineral analysis will be available once food micronutrient data is populated. 
+                    Currently showing macronutrient analysis (protein, carbs, fat, fiber).
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
