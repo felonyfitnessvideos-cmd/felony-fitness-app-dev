@@ -42,6 +42,19 @@
   transform: translateY(-2px); /* Lifts the card slightly for a 3D effect. */
 }
 
+/* Special styling for the recommendations card - orange text to make it stand out. */
+.menu-card.recommendations-card {
+  color: #f97316; /* Orange text color. */
+  font-weight: 700; /* Slightly bolder than other cards. */
+  border-color: #f97316; /* Orange border to match. */
+}
+
+.menu-card.recommendations-card:hover {
+  background-color: #4a5568;
+  color: #fb923c; /* Lighter orange on hover. */
+  border-color: #fb923c;
+}
+
 /* Styles for the daily tip card container. */
 .tip-card {
   background-color: #2d3748;

@@ -252,7 +252,7 @@ const ClientMessaging = () => {
                 ) : (
                     messages.map((message) => {
                         const isDark = theme === 'dark';
-                        const isFromClient = message.sender_id === user.id;
+                        const isFromClient = user && message.sender_id === user.id;
                         return (
                             <div
                                 key={message.id}

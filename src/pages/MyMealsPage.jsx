@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { ChefHat, Clock, Copy, Edit, Filter, Heart, Plus, Search, Star, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { Search, Plus, Edit, Trash2, Heart, Clock, ChefHat, Filter, Star, Copy } from 'lucide-react';
+import { useAuth } from '../AuthContext';
 import MealBuilder from '../components/MealBuilder';
 import { MEAL_CATEGORIES, calculateMealNutrition } from '../constants/mealPlannerConstants';
-import { useAuth } from '../AuthContext';
+import { supabase } from '../supabaseClient';
 import './MyMealsPage.css';
 
 /**
@@ -122,7 +122,6 @@ const MyMealsPage = () => {
         .select(`
           is_favorite,
           custom_name,
-          notes,
           meals (
             *,
             meal_foods (
@@ -154,8 +153,7 @@ const MyMealsPage = () => {
         ...um.meals,
         user_meals: [{
           is_favorite: um.is_favorite,
-          custom_name: um.custom_name,
-          notes: um.notes
+          custom_name: um.custom_name
         }]
       })) || [];
 
@@ -182,8 +180,7 @@ const MyMealsPage = () => {
           ...meal,
           nutrition,
           display_name: userMeal?.custom_name || meal.name,
-          is_favorite: userMeal?.is_favorite || false,
-          user_notes: userMeal?.notes || ''
+          is_favorite: userMeal?.is_favorite || false
         };
       });
 

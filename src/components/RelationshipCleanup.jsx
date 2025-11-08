@@ -5,9 +5,9 @@
  * @version 1.0.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient.js';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext.jsx';
+import { supabase } from '../supabaseClient.js';
 
 const RelationshipCleanup = () => {
   const { user } = useAuth();

@@ -80,17 +80,17 @@ function NutritionPage() {
         <Link to="/nutrition/log" className="menu-card">
           Log
         </Link>
-        {/* Navigation link to the nutrition recommendations page. */}
-        <Link to="/nutrition/recommendations" className="menu-card">
-          Recommendations
+        {/* Navigation link to the my meals page. */}
+        <Link to="/nutrition/my-meals" className="menu-card">
+          My Meals
         </Link>
         {/* Navigation link to the weekly meal planner page. */}
         <Link to="/nutrition/meal-planner" className="menu-card">
           Meal Planner
         </Link>
-        {/* Navigation link to the my meals page. */}
-        <Link to="/nutrition/my-meals" className="menu-card">
-          My Meals
+        {/* Navigation link to the nutrition recommendations page - highlighted with orange. */}
+        <Link to="/nutrition/recommendations" className="menu-card recommendations-card">
+          Recommendations
         </Link>
 
         {/* Conditionally renders the daily tip card only if a tip has been successfully fetched. */}

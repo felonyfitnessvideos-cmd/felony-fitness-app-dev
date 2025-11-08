@@ -18,12 +18,12 @@
  */
 
 import {
-  Activity,
-  ArrowLeft,
-  BookOpen,
-  Calendar,
-  Plus,
-  TrendingUp
+    Activity,
+    ArrowLeft,
+    BookOpen,
+    Calendar,
+    Plus,
+    TrendingUp
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';

@@ -1,5 +1,6 @@
 import { Calendar, ChefHat, Copy, Plus, Share2, ShoppingCart, Target, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../AuthContext';
 import MealBuilder from '../components/MealBuilder';
 import { DAYS_OF_WEEK, getWeekDates, MEAL_TYPES } from '../constants/mealPlannerConstants';
 import { supabase } from '../supabaseClient';
@@ -24,6 +25,9 @@ import './WeeklyMealPlannerPage.css';
  * <WeeklyMealPlannerPage />
  */
 const WeeklyMealPlannerPage = () => {
+  /** @type {Object} Current authenticated user */
+  const { user } = useAuth();
+
   /** @type {[Date[], Function]} Current week's date array for meal planning */
   const [currentWeek, setCurrentWeek] = useState(() => getWeekDates(new Date()));
 
@@ -731,6 +735,7 @@ const WeeklyMealPlannerPage = () => {
    * 
    * Creates a meal_plan_entries record linking a meal to a specific date and meal type
    * within the active meal plan. Allows specifying the number of servings.
+   * Also ensures the meal is added to user_meals if not already present.
    * 
    * @async
    * @param {Object} meal - Complete meal object to add to the plan
@@ -742,9 +747,11 @@ const WeeklyMealPlannerPage = () => {
    * @description
    * Requires both activePlan and selectedSlot to be set (from handleSlotClick).
    * After successful addition:
-   * 1. Reloads plan entries to show the new meal
-   * 2. Closes the meal selector modal
-   * 3. Clears the selected slot state
+   * 1. Ensures meal is in user's collection (user_meals)
+   * 2. Adds meal to the weekly plan (weekly_meal_plan_entries)
+   * 3. Reloads plan entries to show the new meal
+   * 4. Closes the meal selector modal
+   * 5. Clears the selected slot state
    * 
    * @example
    * await addMealToSlot(chickenSalad, 2); // Adds 2 servings of chicken salad
@@ -753,6 +760,24 @@ const WeeklyMealPlannerPage = () => {
     if (!activePlan || !selectedSlot) return;
 
     try {
+      // First, ensure the meal is in user_meals (so it shows up in My Meals page)
+      const { error: userMealError } = await supabase
+        .from('user_meals')
+        .upsert([{
+          user_id: user.id,
+          meal_id: meal.id,
+          is_favorite: false
+        }], {
+          onConflict: 'user_id,meal_id',
+          ignoreDuplicates: true
+        });
+
+      if (userMealError) {
+        console.error('Error adding meal to user collection:', userMealError);
+        // Continue anyway - meal might already be in user_meals
+      }
+
+      // Then add to the meal plan
       const { error } = await supabase
         .from('weekly_meal_plan_entries')
         .insert([{
@@ -770,7 +795,13 @@ const WeeklyMealPlannerPage = () => {
       setSelectedSlot(null);
     } catch (error) {
       console.error('Error adding meal to plan:', error);
-      alert('Error adding meal to plan. Please try again.');
+      
+      // Provide more specific error messages
+      if (error.code === '23505') {
+        alert('This meal is already in that time slot.');
+      } else {
+        alert('Error adding meal to plan. Please try again.');
+      }
     }
   };
 
