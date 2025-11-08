@@ -131,12 +131,12 @@ const MyMealsPage = () => {
               notes,
               food_servings (
                 id,
+                food_name,
                 calories,
                 protein_g,
                 carbs_g,
                 fat_g,
-                serving_description,
-                food_id
+                serving_description
               )
             )
           )
@@ -220,12 +220,12 @@ const MyMealsPage = () => {
             notes,
             food_servings (
               id,
+              food_name,
               calories,
               protein_g,
               carbs_g,
               fat_g,
-              serving_description,
-              food_id
+              serving_description
             )
           )
         `)
