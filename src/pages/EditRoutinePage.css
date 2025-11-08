@@ -92,6 +92,7 @@
 
 .exercise-name {
   font-weight: 600;
+  color: white; /* Make search result names stand out */
 }
 
 .muscle-group {
@@ -164,6 +165,7 @@
 .exercise-details h4 {
   margin: 0 0 0.5rem 0;
   font-size: 1rem;
+  color: white; /* Make exercise names stand out */
   white-space: nowrap; /* Prevents the title from wrapping */
   overflow: hidden;
   text-overflow: ellipsis; /* Adds "..." if the title is too long */
