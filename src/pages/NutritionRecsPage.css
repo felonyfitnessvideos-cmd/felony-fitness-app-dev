@@ -141,6 +141,6 @@
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
-  margin: 1.5rem auto 0;
+  margin: 1.5rem auto 2rem; /* Added bottom margin for spacing before button */
   max-width: 350px; /* Sets a max width for the tip box. */
 }

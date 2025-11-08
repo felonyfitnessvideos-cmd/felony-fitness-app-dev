@@ -205,11 +205,12 @@ Deno.serve(async (req: Request) => {
         .maybeSingle(),
       supabase
         .from('nutrition_logs')
-        // CRITICAL: Need quantity_consumed from nutrition_logs (how many servings eaten)
-        // food_serving_id to join food details separately (avoiding RLS issues)
-        .select('id, food_serving_id, quantity_consumed')
+        // Simplified query: macros are now stored directly in nutrition_logs
+        // Select quantity_consumed and denormalized macro columns
+        .select('quantity_consumed, calories, protein_g, carbs_g, fat_g, food_serving_id')
         .eq('user_id', userId)
-        .gte('created_at', sevenDaysAgo.toISOString()),
+        .gte('log_date', sevenDaysAgo.toISOString().split('T')[0])
+        .not('food_serving_id', 'is', null), // Exclude water entries
       supabase
         .from('workout_logs')
         .select('notes, duration_minutes')
@@ -219,38 +220,7 @@ Deno.serve(async (req: Request) => {
 
     if (profileRes.error) throw new Error('Profile query failed: ' + (profileRes.error.message ?? 'unknown'));
     if (metricsRes.error) throw new Error('Metrics query failed: ' + (metricsRes.error.message ?? 'unknown'));
-    // Defensive: if a previous deployment used a nested select that caused
-    // a PostgREST error about non-existent expanded columns, re-run a
-    // simpler query selecting the raw `food_servings` column. This helps
-    // during staged schema rollouts or client/server mismatches.
-    if (nutritionRes.error) {
-      const msg = String(nutritionRes.error.message || '').toLowerCase();
-      // If the error mentions food_servings or nested expansion failures,
-      // avoid attempting to select a non-existent `food_servings` column on
-      // `nutrition_logs`. Instead, try to retrieve the lightweight
-      // references (id, food_servings_id). If that also fails, continue so
-      // downstream fallbacks will query the `food_servings` table by
-      // user/date window.
-      if (msg.includes('food_servings') || msg.includes('food_servings_1') || msg.includes('quantity_consumed')) {
-        console.warn('Nutrition logs nested select failed; retrying with id, food_serving_id, quantity_consumed select');
-        const fallback = await supabase
-          .from('nutrition_logs')
-          .select('id, food_serving_id, quantity_consumed')
-          .eq('user_id', userId)
-          .gte('created_at', sevenDaysAgo.toISOString());
-
-        if (fallback.error) {
-          // If even the simple select fails, log and set empty data so the
-          // downstream logic will attempt the broad food_servings fallback.
-          console.warn('Fallback nutrition_logs id select failed:', String(fallback.error.message || fallback.error));
-          (nutritionRes as any).data = [];
-        } else {
-          (nutritionRes as any).data = fallback.data;
-        }
-      } else {
-        throw new Error('Nutrition query failed: ' + (nutritionRes.error.message ?? 'unknown'));
-      }
-    }
+    if (nutritionRes.error) throw new Error('Nutrition query failed: ' + (nutritionRes.error.message ?? 'unknown'));
     if (workoutRes.error) throw new Error('Workout query failed: ' + (workoutRes.error.message ?? 'unknown'));
 
     if (!profileRes.data) {
@@ -260,93 +230,40 @@ Deno.serve(async (req: Request) => {
     const userProfile = profileRes.data as UserProfile;
     const latestMetrics = metricsRes.data as BodyMetrics | undefined;
 
-    // Build category counts. Support two storage patterns:
-    // 1) `nutrition_logs` contains a `food_servings` JSON array on the row.
-    // 2) `food_servings` is a separate table and `nutrition_logs` contains
-    //    a `food_servings_id` reference. We detect the pattern and fetch
-    //    servings accordingly.
-    let categoryCounts: Record<string, number> = {};
-
+    // Calculate macro totals directly from nutrition_logs (no joins needed!)
     const rows = nutritionRes.data || [];
-    if (rows.length === 0) {
-      categoryCounts = {};
-    } else if (Array.isArray(rows) && rows[0] && Object.prototype.hasOwnProperty.call(rows[0], 'food_servings')) {
-      // Pattern 1: inline food_servings JSON on each log row
-      categoryCounts = (rows as any[]).reduce((acc: Record<string, number>, log: any) => {
-        const servings = Array.isArray(log.food_servings) ? log.food_servings : [];
-        for (const s of servings) {
-          const category = s?.foods?.category ?? 'Uncategorized';
-          const qty = Number.isFinite(s?.quantity_consumed) ? s.quantity_consumed : 1;
-          acc[category] = (acc[category] ?? 0) + qty;
-        }
-        return acc;
-      }, {} as Record<string, number>);
-    } else {
-      // Pattern 2: separate food_servings table referenced by food_serving_id
-      // Build a map from nutrition_logs for quantity_consumed per food_serving_id
-      const logsByServingId = new Map<any, { quantity_consumed: number, count: number }>();
+    const macroTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    
+    for (const log of rows) {
+      const qty = Number.isFinite((log as any)?.quantity_consumed) ? (log as any).quantity_consumed : 1;
+      macroTotals.calories += ((log as any)?.calories || 0) * qty;
+      macroTotals.protein += ((log as any)?.protein_g || 0) * qty;
+      macroTotals.carbs += ((log as any)?.carbs_g || 0) * qty;
+      macroTotals.fat += ((log as any)?.fat_g || 0) * qty;
+    }
+    
+    // For backward compatibility, also fetch food_serving details for category counts
+    // This is optional and can be removed if categories aren't needed
+    let categoryCounts: Record<string, number> = {};
+    
+    if (rows.length > 0) {
+      const servingIds = rows.map((r: any) => r.food_serving_id).filter(Boolean);
       
-      for (const log of rows) {
-        const servingId = (log as any)?.food_serving_id;
-        const qty = Number.isFinite((log as any)?.quantity_consumed) ? (log as any).quantity_consumed : 1;
-        
-        if (!servingId) continue;
-        
-        const existing = logsByServingId.get(servingId) || { quantity_consumed: 0, count: 0 };
-        existing.quantity_consumed += qty;
-        existing.count += 1;
-        logsByServingId.set(servingId, existing);
-      }
-
-      const idList = Array.from(logsByServingId.keys());
-      if (idList.length > 0) {
-        // Fetch referenced food_servings rows by id
-        const fsRes = await supabase
+      if (servingIds.length > 0) {
+        const { data: servings } = await supabase
           .from('food_servings')
-          .select('id, food_name, category, brand')
-          .in('id', idList as any[]);
-
-        if (fsRes.error) {
-          console.warn('Direct food_servings lookup by id failed:', String(fsRes.error.message || fsRes.error));
-        } else if (fsRes.data && fsRes.data.length > 0) {
-          // Now count categories using quantity_consumed from nutrition_logs
-          categoryCounts = (fsRes.data || []).reduce((acc: Record<string, number>, serving: any) => {
-            const servingId = serving.id;
-            const logData = logsByServingId.get(servingId);
-            
-            if (!logData) return acc;
-            
-            // Use category from food_servings, fallback to food_name
-            const category = serving?.category ?? serving?.food_name ?? 'Uncategorized';
-            const totalQty = logData.quantity_consumed;
-            
-            acc[category] = (acc[category] ?? 0) + totalQty;
-            return acc;
-          }, {} as Record<string, number>);
-        }
-      }
-
-      // If we still have no categoryCounts (schema variant), try a broad fallback:
-      // query the food_servings table for entries in the last 7 days for this user.
-      if (!Object.keys(categoryCounts).length) {
-        try {
-          const broad = await supabase
-            .from('food_servings')
-            .select('id, quantity_consumed, quantity, qty, foods(name, category), category, food_name, user_id, created_at')
-            .eq('user_id', userId)
-            .gte('created_at', sevenDaysAgo.toISOString());
-
-          if (!broad.error && Array.isArray(broad.data) && broad.data.length > 0) {
-            categoryCounts = (broad.data || []).reduce((acc: Record<string, number>, s: any) => {
-              const category = s?.foods?.category ?? s?.category ?? s?.food?.category ?? s?.food_name ?? 'Uncategorized';
-              const qty = Number.isFinite(s?.quantity_consumed) ? s.quantity_consumed : (Number.isFinite(s?.quantity) ? s.quantity : (Number.isFinite(s?.qty) ? s.qty : 1));
-              acc[category] = (acc[category] ?? 0) + qty;
-              return acc;
-            }, {} as Record<string, number>);
+          .select('id, category, food_name')
+          .in('id', servingIds);
+        
+        if (servings) {
+          const categoryMap = new Map(servings.map((s: any) => [s.id, s.category || s.food_name || 'Uncategorized']));
+          
+          for (const log of rows) {
+            const servingId = (log as any)?.food_serving_id;
+            const qty = Number.isFinite((log as any)?.quantity_consumed) ? (log as any).quantity_consumed : 1;
+            const category = categoryMap.get(servingId) || 'Uncategorized';
+            categoryCounts[category] = (categoryCounts[category] || 0) + qty;
           }
-        } catch (broadErr) {
-          console.warn('Broad food_servings fallback failed:', String(broadErr));
-          // fall through to possibly empty categoryCounts
         }
       }
     }
@@ -354,6 +271,11 @@ Deno.serve(async (req: Request) => {
     const nutritionSummary = Object.entries(categoryCounts)
       .map(([category, count]) => '- ' + category + ': ' + count + ' serving(s)')
       .join('\n');
+    
+    // Use the calculated macro totals
+    const macroSummary = macroTotals.calories > 0
+      ? `7-Day Macro Totals:\n- Calories: ${Math.round(macroTotals.calories)}\n- Protein: ${Math.round(macroTotals.protein)}g\n- Carbs: ${Math.round(macroTotals.carbs)}g\n- Fat: ${Math.round(macroTotals.fat)}g`
+      : '';
 
     const workoutsList = (workoutRes.data || [])
       .map((log: any) => {
@@ -368,6 +290,7 @@ Deno.serve(async (req: Request) => {
       'You are an expert fitness and nutrition coach for Felony Fitness, an organization helping formerly incarcerated individuals.',
       'Your tone should be encouraging, straightforward, and supportive.',
       'Analyze the following user data from the last 7 days and provide 3 actionable nutrition-related recommendations.',
+      'IMPORTANT: Compare the 7-Day Macro Totals against the User Goals (daily goals × 7 days). Identify any significant deficiencies or excesses.',
       'User Profile:',
       '- Age: ' + (calculateAge(userProfile.date_of_birth)),
       '- Sex: ' + (userProfile.sex ?? 'Unknown'),
@@ -381,6 +304,7 @@ Deno.serve(async (req: Request) => {
       '- Carbs: ' + (userProfile.daily_carb_goal ?? 'N/A') + 'g',
       '- Fats: ' + (userProfile.daily_fat_goal ?? 'N/A') + 'g',
       '- Diet: ' + (userProfile.diet_preference ?? 'None'),
+      macroSummary || '',
       '7-Day Nutrition Summary (by category):',
       (nutritionSummary || 'No nutrition logged.'),
       'Recent Workouts:',

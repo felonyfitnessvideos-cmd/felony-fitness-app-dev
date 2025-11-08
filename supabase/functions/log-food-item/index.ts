@@ -144,10 +144,54 @@ Deno.serve(async (req) => {
     }
 
     if (!servingId) {
-      throw new Error('Must provide either food_serving_id or external_food');
+      // Water entry - no food serving, just log water consumption
+      const { data: logEntry, error: logError } = await supabase
+        .from('nutrition_logs')
+        .insert({
+          user_id: userId,
+          food_serving_id: null,
+          meal_type: p_meal_type,
+          quantity_consumed: p_quantity_consumed,
+          log_date: logDate,
+          calories: 0,
+          protein_g: 0,
+          carbs_g: 0,
+          fat_g: 0,
+        })
+        .select()
+        .single();
+
+      if (logError) {
+        throw logError;
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          log_id: logEntry.id,
+          quality_score: qualityScore,
+          warning: warning,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
-    // Insert nutrition log entry
+    // Fetch the food serving data to get macro values for denormalization
+    const { data: foodServing, error: servingError } = await supabase
+      .from('food_servings')
+      .select('calories, protein_g, carbs_g, fat_g')
+      .eq('id', servingId)
+      .single();
+
+    if (servingError) {
+      throw new Error('Food serving not found: ' + servingError.message);
+    }
+
+    // Insert nutrition log entry with denormalized macro columns
+    // Use 0 instead of null for missing values
     const { data: logEntry, error: logError } = await supabase
       .from('nutrition_logs')
       .insert({
@@ -156,6 +200,10 @@ Deno.serve(async (req) => {
         meal_type: p_meal_type,
         quantity_consumed: p_quantity_consumed,
         log_date: logDate,
+        calories: foodServing.calories ?? 0,
+        protein_g: foodServing.protein_g ?? 0,
+        carbs_g: foodServing.carbs_g ?? 0,
+        fat_g: foodServing.fat_g ?? 0,
       })
       .select()
       .single();
