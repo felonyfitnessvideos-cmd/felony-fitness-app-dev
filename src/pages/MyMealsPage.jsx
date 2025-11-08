@@ -136,9 +136,7 @@ const MyMealsPage = () => {
                 carbs_g,
                 fat_g,
                 serving_description,
-                foods (
-                  name
-                )
+                food_id
               )
             )
           )
@@ -227,9 +225,7 @@ const MyMealsPage = () => {
               carbs_g,
               fat_g,
               serving_description,
-              foods (
-                name
-              )
+              food_id
             )
           )
         `)
