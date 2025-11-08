@@ -120,15 +120,36 @@ serve(async (req) => {
         recipient_id,
         content,
         created_at,
-        read_at,
-        sender:user_profiles!direct_messages_sender_id_fkey(first_name, last_name, email),
-        recipient:user_profiles!direct_messages_recipient_id_fkey(first_name, last_name, email)
+        read_at
       `)
       .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
       .order("created_at", { ascending: false });
 
     if (messagesError) {
       throw messagesError;
+    }
+
+    // Get unique user IDs from messages
+    const userIds = new Set<string>();
+    for (const message of messages || []) {
+      userIds.add(message.sender_id);
+      userIds.add(message.recipient_id);
+    }
+
+    // Fetch user profiles separately
+    const { data: userProfiles, error: profilesError } = await supabase
+      .from("user_profiles")
+      .select("user_id, first_name, last_name, email")
+      .in("user_id", Array.from(userIds));
+
+    if (profilesError) {
+      console.error("Error fetching user profiles:", profilesError);
+    }
+
+    // Create a map of user profiles for quick lookup
+    const profileMap: Record<string, any> = {};
+    for (const profile of userProfiles || []) {
+      profileMap[profile.user_id] = profile;
     }
 
     // Group messages by conversation partner

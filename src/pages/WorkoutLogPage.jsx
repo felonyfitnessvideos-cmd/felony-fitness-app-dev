@@ -400,6 +400,21 @@ function WorkoutLogPage() {
     if (!currentSet.reps || !currentSet.weight || !workoutLogId || !selectedExercise) return;
     if (saveSetLoading) return; // prevent double submits
     setSaveSetLoading(true);
+    
+    // If this is the first set of the workout, set started_at
+    const isFirstSetOfWorkout = Object.keys(todaysLog).every(key => !todaysLog[key] || todaysLog[key].length === 0);
+    if (isFirstSetOfWorkout) {
+      const { error: updateError } = await supabase
+        .from('workout_logs')
+        .update({ started_at: new Date().toISOString() })
+        .eq('id', workoutLogId)
+        .is('started_at', null); // Only set if not already set
+      
+      if (updateError) {
+        console.warn('Could not set started_at:', updateError);
+      }
+    }
+    
     const newSetPayload = {
       log_id: workoutLogId,
       exercise_id: selectedExercise.id,
@@ -449,10 +464,11 @@ function WorkoutLogPage() {
     setIsTimerOpen(false);
 
     try {
-      const { data: logData, error: fetchError } = await supabase.from('workout_logs').select('created_at').eq('id', workoutLogId).single();
+      const { data: logData, error: fetchError } = await supabase.from('workout_logs').select('started_at, created_at').eq('id', workoutLogId).single();
       if (fetchError) throw fetchError;
 
-      const startTime = new Date(logData.created_at);
+      // Use started_at if available (first set logged), otherwise fall back to created_at
+      const startTime = logData.started_at ? new Date(logData.started_at) : new Date(logData.created_at);
       const endTime = new Date();
       const duration_minutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
       const MET_VALUE = 5.0; // General MET value for weightlifting

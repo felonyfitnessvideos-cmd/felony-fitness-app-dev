@@ -167,8 +167,14 @@ function DashboardPage() {
         supabase.from('user_profiles').select('daily_calorie_goal, daily_protein_goal, daily_water_goal_oz').eq('id', userId).single(),
         supabase.from('nutrition_logs').select('quantity_consumed, water_oz_consumed, food_servings(calories, protein_g)').eq('user_id', userId).gte('created_at', todayStart.toISOString()).lt('created_at', tomorrowStart.toISOString()),
         supabase.from('goals').select('*').eq('user_id', userId),
-        // **FIX APPLIED**: Removed `.single()` to prevent 406 error. The query now returns an array.
-        supabase.from('workout_logs').select('notes, duration_minutes, calories_burned').eq('user_id', userId).gte('created_at', todayStart.toISOString()).lt('created_at', tomorrowStart.toISOString()).order('created_at', { ascending: false }).limit(1)
+        // Get today's completed workouts by log_date instead of created_at
+        supabase.from('workout_logs')
+          .select('notes, duration_minutes, calories_burned, workout_name')
+          .eq('user_id', userId)
+          .eq('log_date', todayStart.toISOString().split('T')[0])
+          .eq('is_complete', true)
+          .order('ended_at', { ascending: false })
+          .limit(1)
       ]);
 
       if (profileRes.data) {
@@ -202,11 +208,11 @@ function DashboardPage() {
         throw workoutLogRes.error;
       }
 
-      // **FIX APPLIED**: Check the array and take the first element if it exists.
+      // Get the latest completed workout for today
       const latestWorkout = workoutLogRes.data?.[0];
       if (latestWorkout) {
         setTraining({
-          name: latestWorkout.notes,
+          name: latestWorkout.workout_name || latestWorkout.notes || 'Workout',
           duration: latestWorkout.duration_minutes,
           calories: latestWorkout.calories_burned
         });
