@@ -56,9 +56,6 @@ function WorkoutsPage() {
       
       {/* A menu of links styled as cards for easy navigation. */}
       <div className="card-menu">
-        <Link to="/workouts/goals" className="menu-card">
-          Goals
-        </Link>
         <Link to="/workouts/routines" className="menu-card">
           Routines
         </Link>
@@ -67,6 +64,9 @@ function WorkoutsPage() {
         </Link>
         <Link to="/workouts/select-routine-log" className="menu-card">
           Log
+        </Link>
+        <Link to="/workouts/goals" className="menu-card">
+          Goals
         </Link>
         <Link to="/workouts/recommendations" className="menu-card">
           Recommendations
