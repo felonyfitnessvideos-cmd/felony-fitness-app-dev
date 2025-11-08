@@ -23,6 +23,7 @@ const ClientMessaging = () => {
     const [sendLoading, setSendLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [currentUserName, setCurrentUserName] = useState('');
     const messagesEndRef = useRef(null);
 
     // Check if user is a client by checking is_client flag in user_profiles
@@ -37,13 +38,17 @@ const ClientMessaging = () => {
             try {
                 const { data, error } = await supabase
                     .from('user_profiles')
-                    .select('is_client')
+                    .select('is_client, first_name, last_name')
                     .eq('id', user.id)
                     .single();
 
                 if (error) throw error;
 
                 setIsClient(data?.is_client || false);
+                
+                // Store user's full name for avatars
+                const fullName = `${data?.first_name || ''} ${data?.last_name || ''}`.trim();
+                setCurrentUserName(fullName || user?.email || 'You');
             } catch (error) {
                 console.error('Error checking client status:', error);
                 setIsClient(false);
@@ -74,17 +79,20 @@ const ClientMessaging = () => {
                 return;
             }
 
-            // Get trainer emails from auth.users (bypassing schema cache issues)
-            // Create trainer list with proper display names
-            const trainersList = trainerIds.map(trainerId => {
-                // For self-testing (when trainer ID equals user ID), show a friendly name
-                const displayName = trainerId === user.id ? 'Your Trainer (David)' : `Trainer ${trainerId.slice(0, 8)}`;
+            // Get trainer profiles
+            const { data: trainerProfiles, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('id, first_name, last_name, email')
+                .in('id', trainerIds);
 
-                return {
-                    id: trainerId,
-                    email: displayName
-                };
-            });
+            if (profileError) throw profileError;
+
+            // Create trainer list with proper display names
+            const trainersList = (trainerProfiles || []).map(trainer => ({
+                id: trainer.id,
+                email: trainer.email,
+                name: `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() || trainer.email
+            }));
 
             setTrainers(trainersList);
 
@@ -199,8 +207,22 @@ const ClientMessaging = () => {
     // Get initials from a name
     const getInitials = (name) => {
         if (!name) return '?';
-        const names = name.trim().split(' ');
+        
+        let nameToProcess = name.trim();
+        
+        // If it's an email, extract the local part and convert to name-like format
+        if (nameToProcess.includes('@')) {
+            const localPart = nameToProcess.split('@')[0];
+            // Replace common separators with spaces
+            nameToProcess = localPart.replace(/[._-]/g, ' ');
+        }
+        
+        const names = nameToProcess.split(' ').filter(n => n.length > 0);
+        
+        if (names.length === 0) return '?';
         if (names.length === 1) return names[0][0]?.toUpperCase() || '?';
+        
+        // Return first and last initial
         return (names[0][0] + names[names.length - 1][0]).toUpperCase();
     };
 
@@ -286,7 +308,7 @@ const ClientMessaging = () => {
                             )}
                         </div>
                         <h3 style={{ margin: 0, color: 'white' }}>
-                            {trainers.length === 1 ? `Message ${selectedTrainer?.email || 'Trainer'}` : 'Messages'}
+                            {trainers.length === 1 ? `Message ${selectedTrainer?.name || selectedTrainer?.email || 'Trainer'}` : 'Messages'}
                         </h3>
                     </div>
                     {isCollapsed ? <ChevronDown size={20} style={{ color: '#ff6b35' }} /> : <ChevronUp size={20} style={{ color: '#ff6b35' }} />}
@@ -314,7 +336,7 @@ const ClientMessaging = () => {
                     >
                         {trainers.map(trainer => (
                             <option key={trainer.id} value={trainer.id} style={{ background: '#1a1a1a' }}>
-                                {trainer.email}
+                                {trainer.name || trainer.email}
                             </option>
                         ))}
                     </select>
@@ -369,8 +391,8 @@ const ClientMessaging = () => {
                                                 flexShrink: 0
                                             }}>
                                                 {isFromClient
-                                                    ? getInitials(message.sender_name || user?.user_metadata?.full_name || user?.email)
-                                                    : getInitials(message.sender_name || selectedTrainer?.email)
+                                                    ? getInitials(message.sender_name || currentUserName)
+                                                    : getInitials(message.sender_name || selectedTrainer?.name || selectedTrainer?.email)
                                                 }
                                             </div>
 

@@ -477,12 +477,13 @@
 }
 
 .message.sent {
-  flex-direction: row-reverse;
-  justify-content: flex-start;
+  flex-direction: row;
+  justify-content: flex-end;
 }
 
 .message.received {
   flex-direction: row;
+  justify-content: flex-start;
 }
 
 .message-avatar {
@@ -500,11 +501,11 @@
 }
 
 .message-avatar-sent {
-  background: #f97316; /* Orange for trainer */
+  background: #f97316 !important; /* Orange for trainer - always */
 }
 
-[data-theme="dark"] .message-avatar {
-  background: #636366; /* Darker gray for dark theme */
+[data-theme="dark"] .message-avatar:not(.message-avatar-sent) {
+  background: #636366; /* Darker gray for dark theme (client messages only) */
 }
 
 .message-bubble {

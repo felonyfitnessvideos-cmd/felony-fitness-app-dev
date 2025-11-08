@@ -1,17 +1,67 @@
 /**
- * @fileoverview Messaging Utilities
+ * @fileoverview Messaging Utilities with Smart Response Tracking
  * @description Comprehensive utilities for handling direct messaging functionality
- * @author Felony Fitness Development Team
- * @version 1.0.0
+ * with intelligent "turn-based" notification system using needs_response column
  * 
- * This module provides utilities for:
- * - Fetching conversations and messages
- * - Sending messages via Edge Function
- * - Managing message read status
- * - Real-time message updates
- * - Error handling and retry logic
+ * @author Felony Fitness Development Team
+ * @version 2.0.0
+ * @since 2025-11-08
+ * 
+ * @module messagingUtils
+ * 
+ * ARCHITECTURE OVERVIEW:
+ * =====================
+ * This module implements a "tennis ball" messaging system where the badge shows
+ * whose turn it is to respond. Key features:
+ * 
+ * 1. SMART RESPONSE TRACKING
+ *    - needs_response boolean column in direct_messages table
+ *    - When you send a message, ALL previous messages in that conversation
+ *      are marked needs_response = false
+ *    - Your new message is marked needs_response = true (recipient's turn)
+ *    - Badge shows count of messages where YOU are recipient and needs_response = true
+ * 
+ * 2. REAL-TIME SUBSCRIPTIONS
+ *    - Listens for INSERT events (new messages received)
+ *    - Listens for UPDATE events (needs_response changes)
+ *    - Automatically triggers callback to refresh badge counts
+ * 
+ * 3. MESSAGE FLOW
+ *    Client → Trainer:
+ *      - Message inserted with needs_response = true
+ *      - Trainer sees badge
+ *      - Trainer responds
+ *      - All previous client messages marked needs_response = false
+ *      - Client sees badge
+ * 
+ * 4. DATABASE SCHEMA
+ *    direct_messages table:
+ *      - sender_id: UUID (FK to user_profiles)
+ *      - recipient_id: UUID (FK to user_profiles)
+ *      - content: TEXT
+ *      - needs_response: BOOLEAN DEFAULT true
+ *      - created_at: TIMESTAMP
+ *      - read_at: TIMESTAMP (nullable)
+ * 
+ * USAGE EXAMPLES:
+ * ===============
+ * 
+ * // Get unread count for badge
+ * const count = await getUnreadMessageCount();
+ * 
+ * // Send a message (auto-clears previous needs_response)
+ * await sendMessage(recipientId, "Hello!");
+ * 
+ * // Subscribe to real-time updates
+ * const subscription = await subscribeToMessages(() => {
+ *   // Reload badge count
+ * });
+ * 
+ * // Clean up
+ * subscription.unsubscribe();
  * 
  * @requires @supabase/supabase-js
+ * @see {@link https://supabase.com/docs/guides/realtime|Supabase Realtime}
  */
 
 import { supabase } from '../supabaseClient';
@@ -27,26 +77,27 @@ import { supabase } from '../supabaseClient';
  * @property {string} user_email - Email of the other user
  * @property {string} last_message_content - Content of the most recent message
  * @property {string} last_message_at - Timestamp of the most recent message
- * @property {number} unread_count - Number of unread messages in this conversation
+ * @property {number} unread_count - Number of messages where current user is recipient and needs_response = true
  * @property {boolean} is_last_message_from_me - Whether the last message was sent by current user
  */
 
 /**
  * @typedef {Object} Message
- * @property {string} id - Unique message identifier
- * @property {string} sender_id - ID of the message sender
- * @property {string} recipient_id - ID of the message recipient
- * @property {string} content - Message content
- * @property {string} created_at - Message creation timestamp
- * @property {boolean} is_read - Whether the message has been read
- * @property {string} sender_name - Name of the message sender
- * @property {boolean} is_from_me - Whether the message was sent by current user
+ * @property {string} id - Unique message identifier (UUID)
+ * @property {string} sender_id - ID of the message sender (UUID, FK to user_profiles)
+ * @property {string} recipient_id - ID of the message recipient (UUID, FK to user_profiles)
+ * @property {string} content - Message content (plain text, max 5000 characters)
+ * @property {string} created_at - Message creation timestamp (ISO 8601)
+ * @property {string|null} read_at - Message read timestamp (ISO 8601, null if unread)
+ * @property {boolean} needs_response - Whether recipient needs to respond (turn-based tracking)
+ * @property {string} sender_name - Full name of the message sender (for avatar display)
+ * @property {boolean} is_from_current_user - Whether the message was sent by current user
  */
 
 /**
  * @typedef {Object} SendMessageRequest
- * @property {string} recipient_id - ID of the message recipient
- * @property {string} content - Message content to send
+ * @property {string} recipient_id - ID of the message recipient (UUID)
+ * @property {string} content - Message content to send (trimmed, 1-5000 characters)
  */
 
 /**
@@ -305,20 +356,71 @@ export async function getConversationUnreadCount(otherUserId) {
 // =====================================================================================
 
 /**
- * Send a new message via Supabase Edge Function
+ * Send a new message with smart response tracking
  * 
- * Sends a message to another user using the secure Edge Function that handles
- * database storage and email notifications.
+ * @description
+ * This function implements the "tennis ball" messaging pattern where sending a message:
+ * 1. Clears needs_response on ALL previous messages in the conversation
+ * 2. Sets needs_response = true on the new message (recipient's turn)
+ * 3. Triggers real-time subscriptions to update badges
+ * 
+ * WORKFLOW:
+ * =========
+ * Step 1: Validate inputs (recipient ID, content length, authentication)
+ * Step 2: Clear needs_response on all messages in this conversation
+ *         Uses OR condition to match both directions:
+ *         - (sender=you AND recipient=them)
+ *         - (sender=them AND recipient=you)
+ * Step 3: Insert new message with needs_response = true
+ * Step 4: Real-time subscription triggers on recipient's device
+ * Step 5: Recipient's badge shows new count
+ * 
+ * TURN-BASED LOGIC:
+ * =================
+ * Before: Client has 3 messages with needs_response = true
+ * Trainer sends message:
+ *   - All 3 client messages → needs_response = false
+ *   - New trainer message → needs_response = true
+ *   - Client's badge clears, Trainer's badge clears, Client sees new badge
  * 
  * @async
- * @param {string} recipientId - ID of the message recipient
- * @param {string} content - Message content to send
- * @returns {Promise<Object>} Response data from the Edge Function
- * @throws {Error} When message sending fails
+ * @param {string} recipientId - UUID of the message recipient
+ * @param {string} content - Message content (1-5000 characters, will be trimmed)
+ * @returns {Promise<Object>} Result object
+ * @returns {string} return.message_id - UUID of the created message
+ * @returns {boolean} return.success - Whether message was sent successfully
+ * 
+ * @throws {Error} If recipient ID or content is missing
+ * @throws {Error} If content is empty after trimming
+ * @throws {Error} If content exceeds 5000 characters
+ * @throws {Error} If user is not authenticated
+ * @throws {Error} If database insert fails
  * 
  * @example
- * const result = await sendMessage('user-123', 'Hello! How is your training going?');
- * console.log('Message sent with ID:', result.message_id);
+ * // Send a simple message
+ * try {
+ *   const result = await sendMessage('user-123', 'Hello! How is your training?');
+ *   console.log('Message sent:', result.message_id);
+ * } catch (error) {
+ *   console.error('Failed to send:', error.message);
+ * }
+ * 
+ * @example
+ * // With error handling
+ * const handleSend = async (recipientId, message) => {
+ *   if (!message.trim()) {
+ *     alert('Message cannot be empty');
+ *     return;
+ *   }
+ *   
+ *   try {
+ *     await sendMessage(recipientId, message);
+ *     setMessage(''); // Clear input
+ *     loadMessages(); // Refresh messages
+ *   } catch (error) {
+ *     alert(`Failed to send: ${error.message}`);
+ *   }
+ * };
  */
 export async function sendMessage(recipientId, content) {
   try {
@@ -502,23 +604,105 @@ async function markMessagesAsReadFallback(otherUserId) {
 // =====================================================================================
 
 /**
- * Subscribe to new messages for real-time updates
+ * Subscribe to real-time message changes (INSERT and UPDATE events)
  * 
- * Sets up a real-time subscription to listen for new messages sent to the current user.
- * The callback function will be called whenever a new message is received.
+ * @description
+ * Sets up a real-time subscription to listen for message changes that affect
+ * the current user's badge count. This implements the core of the "tennis ball"
+ * notification system.
  * 
- * @param {Function} callback - Function to call when new messages arrive
- * @returns {Object} Subscription object that can be used to unsubscribe
- * @throws {Error} When subscription setup fails
+ * SUBSCRIPTION EVENTS:
+ * ====================
+ * 1. INSERT Events (filter: recipient_id = current user)
+ *    - Triggered when someone sends YOU a message
+ *    - Callback fires → reload badge count
+ *    - Badge shows new count
+ * 
+ * 2. UPDATE Events (no filter - catches all updates)
+ *    - Triggered when ANY message's needs_response changes
+ *    - This includes when YOU send a message (clears previous needs_response)
+ *    - Callback fires → reload badge count
+ *    - Badge updates to reflect new state
+ * 
+ * WHY NO FILTER ON UPDATE:
+ * ========================
+ * When you send a message, the UPDATE query affects messages where:
+ * - You are the sender AND recipient is them (your sent messages)
+ * - You are the recipient AND sender is them (their messages to you)
+ * 
+ * If we filtered UPDATE by recipient_id=you, we'd miss the updates to
+ * messages where you're the sender. No filter = catch all updates = badge
+ * updates immediately when you send.
+ * 
+ * USAGE PATTERN:
+ * ==============
+ * ```javascript
+ * useEffect(() => {
+ *   let subscription;
+ *   
+ *   const setup = async () => {
+ *     subscription = await subscribeToMessages(() => {
+ *       // Reload badge count
+ *       loadUnreadCount();
+ *     });
+ *   };
+ *   
+ *   setup();
+ *   
+ *   return () => {
+ *     if (subscription) {
+ *       subscription.unsubscribe();
+ *     }
+ *   };
+ * }, [user]);
+ * ```
+ * 
+ * @async
+ * @param {Function} callback - Function to call when messages change
+ *                               Receives payload: { eventType, old, new }
+ * @returns {Promise<Object|null>} Subscription object with unsubscribe() method,
+ *                                  or null if user not authenticated
+ * @throws {Error} If callback is not a function
+ * @throws {Error} If subscription setup fails
  * 
  * @example
- * const subscription = subscribeToMessages((payload) => {
- *   console.log('New message received:', payload.new);
- *   // Update UI to show new message
- * });
+ * // Basic usage in a React component
+ * const [unreadCount, setUnreadCount] = useState(0);
  * 
- * // Later, unsubscribe
- * subscription.unsubscribe();
+ * useEffect(() => {
+ *   const loadCount = async () => {
+ *     const count = await getUnreadMessageCount();
+ *     setUnreadCount(count);
+ *   };
+ *   
+ *   loadCount();
+ *   
+ *   const setupSub = async () => {
+ *     const sub = await subscribeToMessages(() => {
+ *       loadCount(); // Reload on any message change
+ *     });
+ *     
+ *     return () => sub?.unsubscribe();
+ *   };
+ *   
+ *   return setupSub();
+ * }, []);
+ * 
+ * @example
+ * // With detailed logging
+ * const subscription = await subscribeToMessages((payload) => {
+ *   console.log('Event:', payload.eventType);
+ *   console.log('Old data:', payload.old);
+ *   console.log('New data:', payload.new);
+ *   
+ *   if (payload.eventType === 'INSERT') {
+ *     console.log('New message received!');
+ *   } else if (payload.eventType === 'UPDATE') {
+ *     console.log('Message updated (needs_response changed)');
+ *   }
+ *   
+ *   reloadBadgeCount();
+ * });
  */
 export async function subscribeToMessages(callback) {
   try {
