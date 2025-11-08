@@ -143,7 +143,28 @@ const WeeklyMealPlannerPage = () => {
                 calories,
                 protein_g,
                 carbs_g,
-                fat_g
+                fat_g,
+                fiber_g,
+                sugar_g,
+                sodium_mg,
+                calcium_mg,
+                iron_mg,
+                potassium_mg,
+                magnesium_mg,
+                phosphorus_mg,
+                zinc_mg,
+                copper_mg,
+                selenium_mcg,
+                vitamin_a_mcg,
+                vitamin_c_mg,
+                vitamin_e_mg,
+                vitamin_k_mcg,
+                thiamin_mg,
+                riboflavin_mg,
+                niacin_mg,
+                vitamin_b6_mg,
+                folate_mcg,
+                vitamin_b12_mcg
               )
             )
           )
@@ -686,32 +707,7 @@ const WeeklyMealPlannerPage = () => {
     }
   }, [planEntries, userMeals]);
 
-  const setActiveMealPlan = useCallback(async (planId) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Use Edge Function to safely set active plan
-      const { data, error } = await supabase.functions.invoke('set-active-meal-plan', {
-        body: {
-          plan_id: planId
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        setActivePlan({ id: data.plan_id, name: data.plan_name });
-        await loadMealPlans();
-      }
-    } catch (error) {
-      if (import.meta.env?.DEV) {
-
-        console.warn('WeeklyMealPlannerPage - Error setting active meal plan:', error);
-      }
-    }
-  }, [loadMealPlans]);
-
+  // === Render Functions ===
   const handleSlotClick = (date, mealType) => {
     setSelectedSlot({ date: date.toISOString().split('T')[0], mealType });
 

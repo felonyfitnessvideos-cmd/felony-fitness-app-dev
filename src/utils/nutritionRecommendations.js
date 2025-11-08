@@ -202,15 +202,16 @@ export function identifyDeficiencies(dailyAverages) {
     const target = RDA_TARGETS[nutrient];
 
     // Calculate percentage of optimal intake
-    const percentage = (intake / target.optimal) * 100;
+    const rawPercent = target?.optimal ? (intake / target.optimal) * 100 : 0;
+    const percentOfTarget = Number.isFinite(rawPercent) ? rawPercent : 0;
 
     // Determine deficiency severity
     let severity = null;
-    if (percentage < 50) {
+    if (percentOfTarget < 50) {
       severity = 'critical'; // Less than 50% of optimal
-    } else if (percentage < 75) {
+    } else if (percentOfTarget < 75) {
       severity = 'moderate'; // 50-75% of optimal
-    } else if (percentage < 90) {
+    } else if (percentOfTarget < 90) {
       severity = 'mild'; // 75-90% of optimal
     }
 
@@ -222,16 +223,23 @@ export function identifyDeficiencies(dailyAverages) {
 
     if (severity || excess) {
       const source = NUTRIENT_SOURCES[nutrient];
+      const nutrientName = formatNutrientName(nutrient);
+      const unit = getNutrientUnit(nutrient);
+      
       deficiencies.push({
         nutrient,
+        nutrientName,
         intake: Math.round(intake * 100) / 100,
         target: target.optimal,
         min: target.min,
         max: target.max,
-        percentage: Math.round(percentage),
+        percentage: Math.round(percentOfTarget),
+        percentOfTarget,
+        unit,
         severity: excess ? 'excess' : severity,
         category: source?.category || 'Unknown',
         topFoods: source?.topFoods || [],
+        foodSources: source?.topFoods || [],
         description: source?.description || '',
       });
     }
@@ -384,10 +392,24 @@ export function getSeverityColor(severity) {
  */
 export function getSeverityLabel(severity) {
   switch (severity) {
-    case 'critical': return 'Critical Deficiency';
-    case 'moderate': return 'Moderate Deficiency';
-    case 'mild': return 'Mild Deficiency';
-    case 'excess': return 'Excessive Intake';
+    case 'critical': return 'Critical';
+    case 'moderate': return 'Moderate';
+    case 'mild': return 'Mild';
+    case 'excess': return 'Excess';
     default: return 'Unknown';
   }
+}
+
+/**
+ * Get unit string for a nutrient
+ * 
+ * @param {string} nutrient - Nutrient key (e.g., 'protein_g', 'iron_mg')
+ * @returns {string} Unit string (e.g., 'g', 'mg', 'µg', 'kcal')
+ */
+function getNutrientUnit(nutrient) {
+  if (nutrient.endsWith('_mg')) return 'mg';
+  if (nutrient.endsWith('_mcg')) return 'µg';
+  if (nutrient.endsWith('_g')) return 'g';
+  if (nutrient === 'calories') return 'kcal';
+  return '';
 }

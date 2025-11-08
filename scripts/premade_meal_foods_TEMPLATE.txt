@@ -1,0 +1,123 @@
+id,meal_id,food_servings_id,quantity,notes,created_at
+-- BREAKFAST 1: Classic Oatmeal Bowl (Steel-cut oats + berries + almond butter)
+-- You'll need to get actual food_servings_id values from your database for:
+-- - Steel-cut oats (1 cup cooked)
+-- - Mixed berries (1 cup)
+-- - Almond butter (1 tbsp)
+
+-- BREAKFAST 2: Protein Pancakes (Protein powder + eggs + banana + maple syrup)
+-- Food servings needed:
+-- - Protein powder (1 scoop ~30g)
+-- - Eggs (2 large)
+-- - Banana (1 medium)
+-- - Maple syrup (1 tbsp)
+
+-- BREAKFAST 3: Veggie Scramble (Eggs + spinach + mushrooms)
+-- Food servings needed:
+-- - Eggs (3 large)
+-- - Spinach (1 cup)
+-- - Mushrooms (1/2 cup)
+
+-- BREAKFAST 4: Greek Yogurt Parfait (Greek yogurt + granola + berries)
+-- Food servings needed:
+-- - Greek yogurt (1 cup)
+-- - Granola (1/4 cup)
+-- - Mixed berries (1/2 cup)
+
+-- BREAKFAST 5: Breakfast Burrito (Eggs + black beans + whole wheat tortilla)
+-- Food servings needed:
+-- - Eggs (2 large)
+-- - Black beans (1/2 cup)
+-- - Whole wheat tortilla (1 large)
+
+-- LUNCH 1: Grilled Chicken Salad (Chicken breast + mixed greens + vinaigrette)
+-- Food servings needed:
+-- - Chicken breast (6 oz cooked)
+-- - Mixed greens (2 cups)
+-- - Balsamic vinaigrette (2 tbsp)
+
+-- LUNCH 2: Turkey Wrap (Turkey + avocado + whole wheat wrap)
+-- Food servings needed:
+-- - Turkey breast (4 oz)
+-- - Avocado (1/2 medium)
+-- - Whole wheat tortilla (1 large)
+
+-- LUNCH 3: Quinoa Buddha Bowl (Quinoa + mixed vegetables + tahini)
+-- Food servings needed:
+-- - Quinoa (1 cup cooked)
+-- - Mixed vegetables (2 cups roasted)
+-- - Tahini (2 tbsp)
+
+-- LUNCH 4: Tuna Salad Bowl (Tuna + mixed greens + olive oil)
+-- Food servings needed:
+-- - Tuna canned (5 oz)
+-- - Mixed greens (2 cups)
+-- - Olive oil (1 tbsp)
+
+-- LUNCH 5: Chicken Rice Bowl (Chicken + brown rice + broccoli)
+-- Food servings needed:
+-- - Chicken breast (6 oz cooked)
+-- - Brown rice (1 cup cooked)
+-- - Broccoli (1 cup steamed)
+
+-- DINNER 1: Salmon & Sweet Potato (Salmon + sweet potato + asparagus)
+-- Food servings needed:
+-- - Salmon (6 oz)
+-- - Sweet potato (1 medium)
+-- - Asparagus (1 cup)
+
+-- DINNER 2: Lean Beef Stir Fry (Lean beef + mixed vegetables + brown rice)
+-- Food servings needed:
+-- - Lean beef (6 oz)
+-- - Mixed vegetables (2 cups)
+-- - Brown rice (1 cup cooked)
+
+-- DINNER 3: Turkey Meatballs & Pasta (Turkey + whole wheat pasta + marinara)
+-- Food servings needed:
+-- - Ground turkey (6 oz)
+-- - Whole wheat pasta (2 oz dry)
+-- - Marinara sauce (1/2 cup)
+
+-- DINNER 4: Chicken Fajita Bowl (Chicken + peppers + onions + cauliflower rice)
+-- Food servings needed:
+-- - Chicken breast (6 oz)
+-- - Bell peppers (1 cup)
+-- - Onions (1/2 cup)
+-- - Cauliflower rice (1 cup)
+
+-- DINNER 5: Baked Cod & Veggies (Cod + Brussels sprouts + quinoa)
+-- Food servings needed:
+-- - Cod filet (6 oz)
+-- - Brussels sprouts (1 cup roasted)
+-- - Quinoa (1 cup cooked)
+
+-- SNACK 1: Protein Shake (Protein powder + banana + almond milk)
+-- Food servings needed:
+-- - Protein powder (1 scoop)
+-- - Banana (1 medium)
+-- - Almond milk (1 cup)
+
+-- SNACK 2: Apple & Almond Butter (Apple + almond butter)
+-- Food servings needed:
+-- - Apple (1 medium)
+-- - Almond butter (2 tbsp)
+
+-- SNACK 3: Cottage Cheese & Berries (Cottage cheese + berries)
+-- Food servings needed:
+-- - Cottage cheese (1 cup)
+-- - Mixed berries (1/2 cup)
+
+-- SNACK 4: Hard Boiled Eggs (Eggs)
+-- Food servings needed:
+-- - Hard boiled eggs (2 large)
+
+-- SNACK 5: Greek Yogurt & Nuts (Greek yogurt + mixed nuts)
+-- Food servings needed:
+-- - Greek yogurt (1 cup)
+-- - Mixed nuts (1 oz)
+
+-- NOTE: To complete this file, you need to:
+-- 1. Search for each food in your food_servings table using the MealBuilder
+-- 2. Note the food_servings_id for each ingredient
+-- 3. Replace this file with actual UUIDs and quantities
+-- 4. Generate new UUIDs for each meal_foods entry ID column
