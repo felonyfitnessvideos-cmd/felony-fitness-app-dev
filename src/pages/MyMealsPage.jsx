@@ -40,9 +40,6 @@ const MyMealsPage = () => {
   /** @type {[string, Function]} Selected category filter for meals */
   const [selectedCategory, setSelectedCategory] = useState('all');
   
-  /** @type {[Array, Function]} Selected tags for filtering meals */
-  const [selectedTags, setSelectedTags] = useState([]);
-  
   /** @type {[boolean, Function]} Controls MealBuilder modal visibility */
   const [showMealBuilder, setShowMealBuilder] = useState(false);
   
@@ -61,16 +58,14 @@ const MyMealsPage = () => {
   /** @type {[boolean, Function]} Loading state for meal data fetch */
   const [isLoading, setIsLoading] = useState(true);
   
-  /** @type {[Array, Function]} All available tags from user's meals */
-  const [availableTags, setAvailableTags] = useState([]);
-
-
+  /** @type {[string|null, Function]} Success message for toast notifications */
+  const [successMessage, setSuccessMessage] = useState(null);
 
   /** @constant {Array<Object>} Available meal categories for filtering */
   const categories = MEAL_CATEGORIES;
 
   /**
-   * Filter meals based on search term, category, and tags
+   * Filter meals based on search term and category
    * 
    * @returns {void}
    */
@@ -91,15 +86,8 @@ const MyMealsPage = () => {
       filtered = filtered.filter(meal => meal.category === selectedCategory);
     }
 
-    // Filter by tags
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter(meal =>
-        meal.tags?.some(tag => selectedTags.includes(tag))
-      );
-    }
-
     setFilteredMeals(filtered);
-  }, [meals, searchTerm, selectedCategory, selectedTags]);
+  }, [meals, searchTerm, selectedCategory]);
 
   /**
    * Load user's meals from database with nutrition calculation
@@ -181,15 +169,6 @@ const MyMealsPage = () => {
           is_favorite: userMeal?.is_favorite || false
         };
       });
-
-      // Extract all unique tags
-      const allTags = new Set();
-      mealsWithNutrition.forEach(meal => {
-        if (meal.tags) {
-          meal.tags.forEach(tag => allTags.add(tag));
-        }
-      });
-      setAvailableTags(Array.from(allTags).sort());
 
       setMeals(mealsWithNutrition);
     } catch (error) {
@@ -455,7 +434,10 @@ const MyMealsPage = () => {
       if (userMealError) throw userMealError;
 
       await loadMeals();
-      alert('Meal added to your collection!');
+      
+      // Show success notification
+      setSuccessMessage('Added to My Meals!');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error adding meal:', error);
       alert('Error adding meal. Please try again.');
@@ -533,18 +515,9 @@ const MyMealsPage = () => {
     setEditingMeal(null);
   };
 
-  const toggleTag = (tag) => {
-    setSelectedTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
-    setSelectedTags([]);
   };
 
   const formatTime = (minutes) => {
@@ -606,6 +579,13 @@ const MyMealsPage = () => {
   if (showPremadeMeals) {
     return (
       <div className="my-meals-page premade-fullpage">
+        {/* Success Toast */}
+        {successMessage && (
+          <div className="success-toast">
+            {successMessage}
+          </div>
+        )}
+        
         <div className="page-header">
           <div className="header-left">
             <h1>
@@ -744,26 +724,8 @@ const MyMealsPage = () => {
             </select>
           </div>
 
-          {/* Tags Filter */}
-          {availableTags.length > 0 && (
-            <div className="filter-group">
-              <label>Tags:</label>
-              <div className="tags-filter">
-                {availableTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    className={`tag-filter ${selectedTags.includes(tag) ? 'active' : ''}`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Clear Filters */}
-          {(searchTerm || selectedCategory !== 'all' || selectedTags.length > 0) && (
+          {(searchTerm || selectedCategory !== 'all') && (
             <button onClick={clearFilters} className="clear-filters-btn">
               <Filter className="icon" />
               Clear Filters
@@ -835,18 +797,6 @@ const MyMealsPage = () => {
                   <span className="label">fat</span>
                 </div>
               </div>
-
-              {/* Tags */}
-              {meal.tags && meal.tags.length > 0 && (
-                <div className="meal-tags">
-                  {meal.tags.slice(0, 3).map(tag => (
-                    <span key={tag} className="meal-tag">{tag}</span>
-                  ))}
-                  {meal.tags.length > 3 && (
-                    <span className="meal-tag more">+{meal.tags.length - 3} more</span>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Meal Actions */}

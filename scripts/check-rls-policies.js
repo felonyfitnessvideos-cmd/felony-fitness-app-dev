@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
 
@@ -35,7 +35,7 @@ async function checkRLS() {
       
       // Try alternative method
       console.log('\nTrying alternative query...');
-      const { data: tables, error: err2 } = await supabase
+      const { error: err2 } = await supabase
         .from('meals')
         .select('*')
         .limit(1);
