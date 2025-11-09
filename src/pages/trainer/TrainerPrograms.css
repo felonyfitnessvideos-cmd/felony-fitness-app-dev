@@ -14,9 +14,11 @@
 
 .trainer-programs-container {
   height: 100%;
+  width: 100%;
+  max-width: 100vw;
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
+  background: var(--background-color, #1a202c);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -26,9 +28,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 25px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 20px 0px;
+  background: var(--card-color, #2d3748);
+  border-bottom: 2px solid rgba(249, 115, 22, 0.3);
   flex-shrink: 0;
   gap: 20px;
 }
@@ -45,27 +47,28 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border: 2px solid #e2e8f0;
-  background: white;
+  border: 2px solid rgba(74, 85, 104, 0.5);
+  background: rgba(26, 32, 44, 0.5);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--text-secondary, #a0aec0);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .category-button:hover {
-  border-color: #667eea;
-  background: #f7fafc;
+  border-color: #f97316;
+  background: rgba(45, 55, 72, 0.8);
+  color: var(--text-primary, #f7fafc);
   transform: translateY(-1px);
 }
 
 .category-button.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-color: #f97316;
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
 }
 
 .category-icon {
@@ -90,7 +93,7 @@
 }
 
 .create-program-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border: none;
   padding: 10px 16px;
@@ -106,7 +109,7 @@
 
 .create-program-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
 }
 
 /* Legacy filter styles - keeping for potential reuse */
@@ -119,30 +122,32 @@
 
 .filter-select {
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 2px solid rgba(74, 85, 104, 0.5);
   border-radius: 6px;
   font-size: 14px;
-  background: white;
+  background: rgba(26, 32, 44, 0.5);
+  color: var(--text-primary, #f7fafc);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #f97316;
+  background: rgba(26, 32, 44, 0.8);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
 }
 
 .level-select {
   min-width: 160px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--text-primary, #f7fafc);
 }
 
 .clear-filters-btn {
-  background: #e2e8f0;
-  color: #4a5568;
-  border: 1px solid #cbd5e0;
+  background: rgba(45, 55, 72, 0.8);
+  color: var(--text-secondary, #a0aec0);
+  border: 2px solid rgba(74, 85, 104, 0.5);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 14px;
@@ -151,8 +156,9 @@
 }
 
 .clear-filters-btn:hover {
-  background: #cbd5e0;
-  border-color: #a0aec0;
+  background: rgba(45, 55, 72, 1);
+  border-color: rgba(160, 174, 192, 0.5);
+  color: var(--text-primary, #f7fafc);
 }
 
 
@@ -161,16 +167,47 @@
 .programs-results {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 25px;
+  overflow-x: hidden;
+  padding: 20px 0px 20px 0px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
+.programs-results::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
 
+/* Programs Grid */
+.programs-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
 
 /* No Results */
 .no-results {
   text-align: center;
   padding: 60px 20px;
-  color: #718096;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.no-results svg {
+  color: var(--text-secondary, #a0aec0);
+  margin-bottom: 16px;
+}
+
+.no-results h3 {
+  color: var(--text-primary, #f7fafc);
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.no-results p {
+  color: var(--text-secondary, #a0aec0);
+  font-size: 14px;
 }
 
 .no-results svg {
@@ -189,42 +226,39 @@
   margin: 0;
 }
 
-/* Programs Grid */
-.programs-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 /* Program Cards */
 .program-card {
-  background: white;
+  background: var(--card-color, #2d3748);
   border-radius: 12px;
   padding: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
-  border: 1px solid #f1f5f9;
+  border: 2px solid rgba(74, 85, 104, 0.5);
   display: flex;
   flex-direction: row;
-  overflow: hidden;
-  min-height: 300px;
+  overflow: visible;
+  min-height: 350px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .program-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.3);
+  border-color: rgba(249, 115, 22, 0.5);
 }
 
 /* Left side - Program Info */
 .program-main-content {
-  flex: 1;
-  padding: 20px;
+  flex: 0 1 35%;
+  min-width: 0; /* Important for flex text overflow */
+  max-width: 35%;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border-right: 1px solid #f1f5f9;
+  gap: 8px;
+  border-right: 2px solid rgba(74, 85, 104, 0.5);
+  overflow: hidden;
 }
 
 .program-header {
@@ -240,56 +274,274 @@
 }
 
 .program-exercises h4 {
-  color: #2d3748;
-  font-size: 14px;
+  color: var(--text-primary, #f7fafc);
+  font-size: 12px;
   font-weight: 600;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
 
 .exercise-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  font-size: 13px;
-  color: #4a5568;
-  line-height: 1.6;
+  font-size: 11px;
+  color: var(--text-secondary, #a0aec0);
+  line-height: 1.5;
 }
 
 .exercise-list li {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 /* Right side - Schedule and Muscle Map */
 .program-schedule-section {
-  width: 300px;
-  background: #f8fafc;
-  padding: 20px;
+  flex: 0 1 65%;
+  max-width: 65%;
+  flex-shrink: 0;
+  background: rgba(26, 32, 44, 0.5);
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.program-schedule-section::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .schedule-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .schedule-header label {
-  color: #2d3748;
-  font-size: 14px;
+  color: var(--text-primary, #f7fafc);
+  font-size: 9px;
   font-weight: 600;
   margin: 0;
 }
 
-.days-per-week-selector {
-  background: white;
-  border: 1px solid #e2e8f0;
+.muscle-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.muscle-tag {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  padding: 4px 10px;
   border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: #4a5568;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.muscle-tag.more {
+  background: #64748b;
+  opacity: 0.8;
+}
+
+/* Program Stats */
+.program-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 4px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stat-label {
+  color: #64748b;
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: #1e293b;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* Muscle Map Preview */
+.muscle-map-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--card-color, #2d3748);
+  border-radius: 8px;
+  border: 2px solid rgba(74, 85, 104, 0.5);
+}
+
+.days-per-week-selector {
+  background: rgba(26, 32, 44, 0.6);
+  border: 2px solid #f97316;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 10px;
+  color: var(--text-primary, #f7fafc);
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.days-per-week-selector:hover {
+  background: rgba(45, 55, 72, 0.8);
+  border-color: #ea580c;
+}
+
+.days-per-week-selector:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3);
+}
+
+/* Muscle Map Section */
+.muscle-map-section {
+  background: rgba(45, 55, 72, 0.6);
+  border-radius: 6px;
+  padding: 4px;
+  border: 1px solid rgba(74, 85, 104, 0.5);
+}
+
+.muscle-map-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 120px;
+  background: rgba(26, 32, 44, 0.5);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.muscle-map-front,
+.muscle-map-back {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 70px;
+}
+
+.muscle-map-compact {
+  width: 100%;
+  max-width: 70px;
+  height: auto;
+}
+
+.muscle-map-compact .muscle-map-svg {
+  width: 100%;
+  height: auto;
+  max-height: 110px;
+}
+
+/* Hide view labels in compact mode */
+.muscle-map-compact .view-toggle,
+.muscle-map-compact .view-label {
+  display: none !important;
+}
+
+/* Routine Preview */
+.routine-preview {
+  background: rgba(45, 55, 72, 0.6);
+  border-radius: 6px;
+  padding: 5px;
+  border: 1px solid rgba(74, 85, 104, 0.5);
+}
+
+.routine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.routine-card-mini {
+  background: rgba(45, 55, 72, 0.6);
+  border: 1px solid rgba(74, 85, 104, 0.5);
+  border-radius: 4px;
+  padding: 4px;
+  transition: all 0.2s;
+}
+
+.routine-card-mini:hover {
+  border-color: #f97316;
+  background: rgba(45, 55, 72, 0.9);
+  box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
+}
+
+.routine-header-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.routine-day {
+  background: #f97316;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  width: 100%;
+}
+
+.routine-name-mini {
+  color: var(--text-primary, #f7fafc);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.routine-stats-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 12px;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.routine-stats-mini span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+/* Target Muscles Section */
+.target-muscles-section {
+  margin: 12px 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(74, 85, 104, 0.3);
+}
+
+.target-muscles-section label {
+  color: var(--text-secondary, #a0aec0);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: block;
 }
 
 .day-schedule {
@@ -304,13 +556,13 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: white;
+  background: rgba(45, 55, 72, 0.6);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 2px solid rgba(74, 85, 104, 0.5);
 }
 
 .day-label {
-  background: #667eea;
+  background: #f97316;
   color: white;
   padding: 6px 12px;
   border-radius: 6px;
@@ -379,9 +631,9 @@
 }
 
 .client-search-btn {
-  background: white;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
+  background: rgba(45, 55, 72, 0.8);
+  color: var(--text-primary, #f7fafc);
+  border: 2px solid rgba(74, 85, 104, 0.5);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 12px;
@@ -389,37 +641,89 @@
   cursor: pointer;
   transition: all 0.2s ease;
   width: 100%;
+  margin-bottom: 8px;
 }
 
 .client-search-btn:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+  background: rgba(45, 55, 72, 1);
+  border-color: #f97316;
+}
+
+.client-search-btn:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+}
+
+.add-to-client-btn:disabled {
+  background: #64748b;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .program-actions-bottom {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .configure-program-btn {
   width: 100%;
-  background: #667eea;
+  background: #f97316;
   color: white;
   border: none;
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   transition: all 0.3s ease;
 }
 
 .configure-program-btn:hover {
-  background: #5a67d8;
+  background: #ea580c;
   transform: translateY(-1px);
+}
+
+.add-to-client-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.add-to-client-btn:hover {
+  background: #059669;
+}
+
+.client-search-btn {
+  background: rgba(26, 32, 44, 0.5);
+  color: var(--text-secondary, #a0aec0);
+  border: 1px solid rgba(74, 85, 104, 0.5);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.client-search-btn:hover {
+  background: rgba(45, 55, 72, 0.8);
+  border-color: rgba(249, 115, 22, 0.5);
+  color: var(--text-primary, #f7fafc);
 }
 
 .program-header {
@@ -431,29 +735,60 @@
 }
 
 .program-header h3 {
-  color: #2d3748;
-  font-size: 16px;
+  color: var(--text-primary, #f7fafc);
+  font-size: 15px;
   font-weight: 600;
   margin: 0;
   line-height: 1.3;
   flex: 1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .program-difficulty {
-  background: #f7fafc;
+  background: rgba(45, 55, 72, 0.8);
   padding: 4px 10px;
   border-radius: 16px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(74, 85, 104, 0.5);
+  color: var(--text-secondary, #a0aec0);
+}
+
+/* Program Edit Button */
+.program-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(26, 32, 44, 0.5);
+  border: 1px solid rgba(74, 85, 104, 0.5);
+  border-radius: 6px;
+  color: var(--text-secondary, #a0aec0);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+  width: fit-content;
+}
+
+.program-edit-btn:hover {
+  background: rgba(45, 55, 72, 0.8);
+  border-color: #f97316;
+  color: #f97316;
+}
+
+.program-edit-btn svg {
+  flex-shrink: 0;
 }
 
 .program-description {
-  color: #4a5568;
-  font-size: 14px;
+  color: var(--text-secondary, #a0aec0);
+  font-size: 12px;
   line-height: 1.4;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -475,17 +810,17 @@
 }
 
 .detail-item:not(:last-child) {
-  border-bottom: 1px solid #f7fafc;
+  border-bottom: 1px solid rgba(74, 85, 104, 0.3);
 }
 
 .detail-label {
-  color: #718096;
+  color: var(--text-secondary, #a0aec0);
   font-size: 12px;
   font-weight: 600;
 }
 
 .detail-value {
-  color: #2d3748;
+  color: var(--text-primary, #f7fafc);
   font-size: 12px;
   font-weight: 500;
   text-align: right;
@@ -498,12 +833,15 @@
 /* Program Actions */
 .program-actions {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .configure-program-btn {
   flex: 1;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border: none;
   padding: 10px 16px;
@@ -520,7 +858,7 @@
 
 .configure-program-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
 }
 
 /* Program Detail */
@@ -538,13 +876,13 @@
   align-items: center;
   gap: 15px;
   padding: 20px 25px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--card-color, #2d3748);
+  border-bottom: 2px solid rgba(74, 85, 104, 0.5);
   flex-shrink: 0;
 }
 
 .back-button {
-  background: #f7fafc;
+  background: rgba(45, 55, 72, 0.8);
   border: 1px solid #e2e8f0;
   color: #4a5568;
   padding: 8px 12px;
@@ -601,7 +939,7 @@
   height: 32px;
   border: 3px solid #f1f5f9;
   border-radius: 50%;
-  border-top-color: #667eea;
+  border-top-color: #f97316;
   animation: spin 1s ease-in-out infinite;
   margin-bottom: 15px;
 }
@@ -617,7 +955,7 @@
 }
 
 .retry-button {
-  background: #667eea;
+  background: #f97316;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -734,13 +1072,13 @@
 }
 
 .program-config-modal {
-  background: white;
+  background: var(--card-color, #2d3748);
   border-radius: 12px;
   width: 100%;
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
 }
 
 .modal-header {
@@ -800,12 +1138,13 @@
 }
 
 .program-stats span {
-  background: #f7fafc;
-  color: #4a5568;
+  background: rgba(45, 55, 72, 0.6);
+  color: var(--text-secondary, #a0aec0);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
+  border: 1px solid rgba(74, 85, 104, 0.3);
 }
 
 .config-section {
@@ -813,7 +1152,7 @@
 }
 
 .config-section h3 {
-  color: #2d3748;
+  color: var(--text-primary, #f7fafc);
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 15px 0;
@@ -833,7 +1172,7 @@
 }
 
 .config-group label {
-  color: #4a5568;
+  color: var(--text-secondary, #a0aec0);
   font-weight: 500;
   font-size: 14px;
 }
@@ -841,19 +1180,19 @@
 .config-select,
 .config-input {
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 2px solid rgba(74, 85, 104, 0.5);
   border-radius: 6px;
   font-size: 14px;
-  background: white;
-  color: #2d3748;
+  background: rgba(26, 32, 44, 0.6);
+  color: var(--text-primary, #f7fafc);
   transition: all 0.2s ease;
 }
 
 .config-select:focus,
 .config-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
 
 .routines-preview {
@@ -883,13 +1222,13 @@
   align-items: center;
   gap: 15px;
   padding: 10px;
-  background: white;
+  background: var(--card-color, #2d3748);
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 2px solid rgba(74, 85, 104, 0.5);
 }
 
 .routine-date {
-  color: #667eea;
+  color: #f97316;
   font-weight: 600;
   font-size: 14px;
   min-width: 100px;
@@ -938,16 +1277,16 @@
 }
 
 .routine-card {
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--card-color, #2d3748);
+  border: 2px solid rgba(74, 85, 104, 0.5);
   border-radius: 8px;
   padding: 16px;
   transition: all 0.2s ease;
 }
 
 .routine-card:hover {
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
 }
 
 .routine-header {
@@ -962,12 +1301,12 @@
 }
 
 .routine-title strong {
-  color: #2d3748;
+  color: var(--text-primary, #f7fafc);
   font-size: 14px;
 }
 
 .routine-day {
-  background: #667eea;
+  background: #f97316;
   color: white;
   padding: 2px 8px;
   border-radius: 12px;
@@ -986,7 +1325,7 @@
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #718096;
+  color: var(--text-secondary, #a0aec0);
   flex: 1;
 }
 
@@ -1124,7 +1463,7 @@
 .stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #667eea;
+  color: #f97316;
 }
 
 .stat-label {
@@ -1160,8 +1499,8 @@
 }
 
 .program-analytics-section .program-muscle-map {
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--card-color, #2d3748);
+  border: 2px solid rgba(74, 85, 104, 0.5);
   border-radius: 8px;
   padding: 20px;
   min-height: 160px;
@@ -1224,13 +1563,13 @@
 }
 
 .routine-selector-modal {
-  background: white;
+  background: var(--card-color, #2d3748);
   border-radius: 12px;
   width: 100%;
   max-width: 600px;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
 }
 
 .routine-selector-header {
@@ -1291,8 +1630,8 @@
 }
 
 .available-routine-item:hover {
-  border-color: #667eea;
-  background: white;
+  border-color: #f97316;
+  background: rgba(45, 55, 72, 0.8);
 }
 
 .available-routine-item .routine-info {
@@ -1323,7 +1662,7 @@
 }
 
 .add-routine-to-program-btn {
-  background: #667eea;
+  background: #f97316;
   color: white;
   border: none;
   padding: 8px 16px;
@@ -1430,7 +1769,7 @@
   height: 20px;
   border: 2px solid #e2e8f0;
   border-radius: 50%;
-  border-top-color: #667eea;
+  border-top-color: #f97316;
   animation: spin 1s ease-in-out infinite;
 }
 
@@ -1473,7 +1812,7 @@
 }
 
 .stat-item svg {
-  color: #667eea;
+  color: #f97316;
   flex-shrink: 0;
 }
 
@@ -1535,15 +1874,15 @@
 }
 
 .muscle-tag.rank-1 {
-  background: #667eea;
+  background: #f97316;
   color: white;
-  border-color: #667eea;
+  border-color: #f97316;
 }
 
 .muscle-tag.rank-2 {
-  background: #764ba2;
+  background: #ea580c;
   color: white;
-  border-color: #764ba2;
+  border-color: #ea580c;
 }
 
 .muscle-tag.rank-3 {
