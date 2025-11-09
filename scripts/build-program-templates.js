@@ -114,15 +114,19 @@ async function generateProgramTemplates() {
   sql += `DELETE FROM programs WHERE is_template = TRUE AND exercise_pool = '[]'::jsonb;\n\n`;
 
   programs.forEach((prog, idx) => {
-    sql += `-- ${idx + 1}. ${prog.name}\n`;
+    // Escape single quotes for SQL safety
+    const escapeSql = (str) => str.replace(/'/g, "''");
+    const exerciseJson = JSON.stringify(prog.exercises).replace(/'/g, "''");
+    
+    sql += `-- ${idx + 1}. ${escapeSql(prog.name)}\n`;
     sql += `INSERT INTO programs (name, description, difficulty_level, estimated_weeks, program_type, exercise_pool, is_template, is_active)\n`;
     sql += `VALUES (\n`;
-    sql += `    '${prog.name}',\n`;
-    sql += `    '${prog.description}',\n`;
-    sql += `    '${prog.difficulty}',\n`;
+    sql += `    '${escapeSql(prog.name)}',\n`;
+    sql += `    '${escapeSql(prog.description)}',\n`;
+    sql += `    '${escapeSql(prog.difficulty)}',\n`;
     sql += `    ${prog.weeks},\n`;
-    sql += `    '${prog.type}',\n`;
-    sql += `    '${JSON.stringify(prog.exercises)}'::jsonb,\n`;
+    sql += `    '${escapeSql(prog.type)}',\n`;
+    sql += `    '${exerciseJson}'::jsonb,\n`;
     sql += `    TRUE,\n`;
     sql += `    TRUE\n`;
     sql += `);\n\n`;

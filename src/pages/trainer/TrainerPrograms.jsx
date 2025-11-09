@@ -1045,7 +1045,7 @@ const ProgramLibrary = () => {
         user_id: clientId,
         routine_name: `${program.name} - ${routine.name}`,
         name: `${program.name} - ${routine.name}`,
-        description: `Day ${index + 1}: ${routine.focus}`,
+        description: `Day ${index + 1}: ${routine.name}`,
         is_active: true,
         is_public: false
       }));
@@ -1072,27 +1072,36 @@ const ProgramLibrary = () => {
         });
       });
 
-      // Insert all routine_exercises
-      const { error: exercisesError } = await supabase
-        .from('routine_exercises')
-        .insert(routineExercises);
-
-      if (exercisesError) throw exercisesError;
-
-      // Update trainer_clients with the routine IDs
+      // Get routine IDs for cleanup if needed
       const routineIds = insertedRoutines.map(r => r.id);
-      
-      const { error: updateError } = await supabase
-        .from('trainer_clients')
-        .update({
-          assigned_program_id: programId,
-          generated_routine_ids: routineIds,
-          updated_at: new Date().toISOString()
-        })
-        .eq('trainer_id', user.id)
-        .eq('client_id', clientId);
 
-      if (updateError) throw updateError;
+      try {
+        // Insert routine_exercises if any exist
+        if (routineExercises.length > 0) {
+          const { error: exercisesError } = await supabase
+            .from('routine_exercises')
+            .insert(routineExercises);
+
+          if (exercisesError) throw exercisesError;
+        }
+
+        // Update trainer_clients with the routine IDs
+        const { error: updateError } = await supabase
+          .from('trainer_clients')
+          .update({
+            assigned_program_id: programId,
+            generated_routine_ids: routineIds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('trainer_id', user.id)
+          .eq('client_id', clientId);
+
+        if (updateError) throw updateError;
+      } catch (err) {
+        // Rollback: delete created routines if downstream operations fail
+        await supabase.from('workout_routines').delete().in('id', routineIds);
+        throw err;
+      }
 
       alert(`Successfully assigned ${program.name} to client! ${routines.length} workouts created.`);
       

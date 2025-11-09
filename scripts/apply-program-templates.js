@@ -44,11 +44,11 @@ async function applyProgramTemplates() {
   for (let i = 0; i < insertStatements.length; i++) {
     const stmt = insertStatements[i];
     
-    // Extract values using regex
+    // Extract values using regex (non-capturing groups for alternations)
     const nameMatch = stmt.match(/name,.*?VALUES\s*\(\s*'([^']+)'/s);
-    const descMatch = stmt.match(/'([^']+)',\s*'beginner|intermediate|advanced'/s);
+    const descMatch = stmt.match(/'([^']+)',\s*'(?:beginner|intermediate|advanced)'/s);
     const diffMatch = stmt.match(/'(beginner|intermediate|advanced)'/);
-    const weeksMatch = stmt.match(/(\d+),\s*'strength|hypertrophy'/);
+    const weeksMatch = stmt.match(/(\d+),\s*'(?:strength|hypertrophy)'/);
     const typeMatch = stmt.match(/'(strength|hypertrophy)'/);
     const poolMatch = stmt.match(/'(\[{.*?}\])'::jsonb/s);
     
