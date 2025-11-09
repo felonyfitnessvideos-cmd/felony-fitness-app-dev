@@ -36,6 +36,10 @@ dist-ssr
 
 # Ignore local database/backup dumps
 backups/
+database-backups/
+*.sql
+*.dump
+*.backup
 
 # Protocols (internal procedures, reports, summaries)
 Protocols/

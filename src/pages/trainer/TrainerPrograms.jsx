@@ -18,19 +18,23 @@
  */
 
 import {
-    Activity,
-    ArrowLeft,
-    BookOpen,
-    Calendar,
-    Plus,
-    TrendingUp
+  Activity,
+  ArrowLeft,
+  BookOpen,
+  Calendar,
+  Edit,
+  Plus,
+  TrendingUp
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
+import ProgramEditorModal from '../../components/trainer/ProgramEditorModal';
+import AnatomicalMuscleMap from '../../components/workout-builder/AnatomicalMuscleMap';
 import InteractiveMuscleMap from '../../components/workout-builder/InteractiveMuscleMap';
 import { supabase } from '../../supabaseClient';
 import { calculateProgramEngagement, generateHeatmapData } from '../../utils/programAnalytics';
+import { generateRoutines } from '../../utils/routineGenerator';
 import './TrainerPrograms.css';
 
 /**
@@ -707,12 +711,17 @@ const ProgramConfigModal = ({ program, onClose, user }) => {
 const ProgramLibrary = () => {
   const { user } = useAuth();
   const [programs, setPrograms] = useState([]);
-  const [programRoutines, setProgramRoutines] = useState({});
+  const [programRoutines, setProgramRoutines] = useState({}); // Generated routines by program ID
+  const [programFrequencies, setProgramFrequencies] = useState({}); // Selected frequency for each program
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [difficultyFilter, setDifficultyFilter] = useState('intermediate');
   const [selectedCategory, setSelectedCategory] = useState('Strength');
   const [selectedProgram, setSelectedProgram] = useState(null);
+  const [editingProgram, setEditingProgram] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [selectedClientForProgram, setSelectedClientForProgram] = useState({}); // programId -> clientId mapping
+  const [assigningToClient, setAssigningToClient] = useState(false);
 
   const categories = [
     { name: 'Strength', icon: '💪' },
@@ -720,7 +729,7 @@ const ProgramLibrary = () => {
     { name: 'Endurance', icon: '🏃' },
     { name: 'Flexibility', icon: '🧘' },
     { name: 'Balance', icon: '⚖️' },
-    { name: 'Recovery', icon: '🛌' }
+    { name: 'Recovery', icon: '🩹' }
   ];
 
   /**
@@ -734,90 +743,96 @@ const ProgramLibrary = () => {
       setLoading(true);
       setError(null);
 
-      // For demo purposes, let's use mock data that matches the mockup
-      const mockPrograms = [
-        {
-          id: 'mock-beginner-strength',
-          name: 'Beginner Strength Foundation',
-          description: 'Perfect starting point for newcomers to strength training. Focuses on fundamental movement patterns and building a solid base.',
-          difficulty_level: 'beginner',
-          estimated_weeks: 8,
-          target_muscle_groups: ['Chest', 'Back', 'Legs', 'Shoulders'],
-          routine_count: 3,
-          created_by: 'trainer',
-          is_active: true
-        },
-        {
-          id: 'mock-intermediate-hypertrophy',
-          name: 'Intermediate Hypertrophy',
-          description: 'Muscle building program designed for intermediate lifters focusing on volume and progressive overload.',
-          difficulty_level: 'intermediate',
-          estimated_weeks: 12,
-          target_muscle_groups: ['Chest', 'Back', 'Arms', 'Legs', 'Shoulders'],
-          routine_count: 4,
-          created_by: 'trainer',
-          is_active: true
-        },
-        {
-          id: 'mock-advanced-powerlifting',
-          name: 'Advanced Powerlifting',
-          description: 'Competition-focused program for advanced lifters emphasizing the big three lifts: squat, bench, deadlift.',
-          difficulty_level: 'advanced',
-          estimated_weeks: 16,
-          target_muscle_groups: ['Full Body', 'Core'],
-          routine_count: 5,
-          created_by: 'trainer',
-          is_active: true
-        }
-      ];
-
-      // Mock routines for demonstration
-      setProgramRoutines({
-        'mock-beginner-strength': [
-          { id: 'r1', name: 'Legs & Shoulders', exercises: [] },
-          { id: 'r2', name: 'Back & Biceps', exercises: [] },
-          { id: 'r3', name: 'Chest & Triceps', exercises: [] }
-        ]
-      });
-
-      setPrograms(mockPrograms);
-
-      // Also try to fetch real data if available
+      // Fetch programs from database
       const { data: programsData, error: programsError } = await supabase
         .from('programs')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (!programsError && programsData && programsData.length > 0) {
-        // If real data exists, use it instead
-        const programsWithCounts = await Promise.all(
-          programsData.map(async (program) => {
-            const { data: routinesData, count } = await supabase
-              .from('program_routines')
-              .select('*', { count: 'exact' })
-              .eq('program_id', program.id);
-
-            if (routinesData && routinesData.length > 0) {
-              setProgramRoutines(prev => ({
-                ...prev,
-                [program.id]: routinesData
-              }));
-            }
-
-            return {
-              ...program,
-              routine_count: count || 0
-            };
-          })
-        );
-
-        setPrograms(programsWithCounts);
+      if (programsError) {
+        throw programsError;
       }
+
+      if (!programsData || programsData.length === 0) {
+        setPrograms([]);
+        setLoading(false);
+        return;
+      }
+
+      // Collect all unique exercise IDs from all programs
+      const allExerciseIds = new Set();
+      programsData.forEach(program => {
+        const exercisePool = program.exercise_pool || [];
+        exercisePool.forEach(ex => {
+          if (ex.exercise_id) {
+            allExerciseIds.add(ex.exercise_id);
+          }
+        });
+      });
+
+      // Fetch all exercises in one query (without equipment_required - column doesn't exist)
+      const { data: exercisesData, error: exercisesError } = await supabase
+        .from('exercises')
+        .select('id, name, primary_muscle, secondary_muscle, tertiary_muscle, difficulty_level')
+        .in('id', Array.from(allExerciseIds));
+
+      if (exercisesError) {
+        console.error('Error fetching exercises:', exercisesError);
+        // Continue without exercise data rather than failing completely
+      }
+
+      // Create exercise lookup map
+      const exerciseMap = new Map();
+      (exercisesData || []).forEach(ex => {
+        exerciseMap.set(ex.id, ex);
+      });
+
+      // Process programs and hydrate exercise data
+      const processedPrograms = programsData.map(program => {
+        const exercisePool = program.exercise_pool || [];
+        const muscleGroups = new Set();
+        
+        // Hydrate exercise pool with full exercise data
+        const hydratedExercises = exercisePool.map(poolEntry => {
+          const exercise = exerciseMap.get(poolEntry.exercise_id);
+          
+          // Extract muscle groups from either the pool entry or the exercise itself
+          const muscles = poolEntry.muscle_groups || {
+            primary: exercise?.primary_muscle ? [exercise.primary_muscle] : [],
+            secondary: exercise?.secondary_muscle ? [exercise.secondary_muscle] : [],
+            tertiary: exercise?.tertiary_muscle ? [exercise.tertiary_muscle] : []
+          };
+
+          // Add ALL muscle groups (primary, secondary, tertiary) to the set
+          muscles.primary?.forEach(m => m && muscleGroups.add(m));
+          muscles.secondary?.forEach(m => m && muscleGroups.add(m));
+          muscles.tertiary?.forEach(m => m && muscleGroups.add(m));
+
+          return {
+            ...poolEntry,
+            exercise_name: exercise?.name || 'Unknown Exercise',
+            exercise_data: exercise,
+            muscle_groups: muscles
+          };
+        });
+
+        const targetMuscles = Array.from(muscleGroups);
+
+        return {
+          ...program,
+          exercise_pool: hydratedExercises,
+          target_muscle_groups: targetMuscles,
+          routine_count: hydratedExercises.length
+        };
+      });
+
+      setPrograms(processedPrograms);
 
     } catch (err) {
       console.error('Error fetching programs:', err);
-      // Don't show error, fall back to mock data
+      setError('Failed to load programs. Please try again.');
+      setPrograms([]);
       console.log('Using mock data for demonstration');
     } finally {
       setLoading(false);
@@ -852,8 +867,9 @@ const ProgramLibrary = () => {
    * @returns {boolean} Whether program matches category
    */
   const getCategoryMatch = (program, category) => {
-    const programName = program.name.toLowerCase();
-    const programDesc = program.description.toLowerCase();
+    // Handle null/undefined values safely
+    const programName = (program?.name || '').toLowerCase();
+    const programDesc = (program?.description || '').toLowerCase();
 
     switch (category) {
       case 'Strength':
@@ -918,6 +934,192 @@ const ProgramLibrary = () => {
     return displays[level] || level;
   };
 
+  /**
+   * Handle frequency change and generate routines for a program
+   * @function handleFrequencyChange
+   * @param {string} programId - Program ID
+   * @param {number} frequency - Training days per week (2-7)
+   */
+  const handleFrequencyChange = (programId, frequency) => {
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+
+    // Update selected frequency
+    setProgramFrequencies(prev => ({
+      ...prev,
+      [programId]: frequency
+    }));
+
+    // Generate routines from exercise pool
+    try {
+      const routines = generateRoutines(program.exercise_pool, frequency);
+      setProgramRoutines(prev => ({
+        ...prev,
+        [programId]: routines
+      }));
+    } catch (err) {
+      console.error('Error generating routines:', err);
+    }
+  };
+
+  /**
+   * Get selected frequency for a program (default to 3)
+   * @function getProgramFrequency
+   * @param {string} programId - Program ID
+   * @returns {number} Selected frequency
+   */
+  const getProgramFrequency = (programId) => {
+    return programFrequencies[programId] || 3;
+  };
+
+  /**
+   * Get generated routines for a program
+   * @function getProgramRoutines
+   * @param {string} programId - Program ID
+   * @returns {Array} Generated routines
+   */
+  const getProgramRoutines = (programId) => {
+    return programRoutines[programId] || [];
+  };
+
+  /**
+   * Fetch trainer's active clients
+   * @async
+   * @function fetchClients
+   * @returns {Promise<void>}
+   */
+  const fetchClients = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Query trainer_clients directly - full_name is synced from user_profiles via trigger
+      const { data, error } = await supabase
+        .from('trainer_clients')
+        .select('client_id, full_name')
+        .eq('trainer_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Simple mapping - just need UUID and name for the dropdown
+      const clientsList = data.map(tc => ({
+        id: tc.client_id,
+        name: tc.full_name || 'Unknown Client'
+      }));
+
+      setClients(clientsList);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    }
+  };
+
+  /**
+   * Assign program to a client by creating workout_routines
+   * @async
+   * @function handleAssignToClient
+   * @param {string} programId - Program ID
+   * @returns {Promise<void>}
+   */
+  const handleAssignToClient = async (programId) => {
+    const clientId = selectedClientForProgram[programId];
+    
+    if (!clientId) {
+      alert('Please select a client first');
+      return;
+    }
+
+    const program = programs.find(p => p.id === programId);
+    const routines = getProgramRoutines(programId);
+
+    if (!routines || routines.length === 0) {
+      alert('No routines generated for this program');
+      return;
+    }
+
+    try {
+      setAssigningToClient(true);
+
+      // Create workout_routines for each generated routine
+      const workoutRoutines = routines.map((routine, index) => ({
+        user_id: clientId,
+        routine_name: `${program.name} - ${routine.name}`,
+        name: `${program.name} - ${routine.name}`,
+        description: `Day ${index + 1}: ${routine.name}`,
+        is_active: true,
+        is_public: false
+      }));
+
+      const { data: insertedRoutines, error: insertError } = await supabase
+        .from('workout_routines')
+        .insert(workoutRoutines)
+        .select();
+
+      if (insertError) throw insertError;
+
+      // Create routine_exercises linking records for each routine
+      const routineExercises = [];
+      insertedRoutines.forEach((routine, routineIndex) => {
+        const exercises = routines[routineIndex].exercises || [];
+        exercises.forEach((exercise, exerciseIndex) => {
+          routineExercises.push({
+            routine_id: routine.id,
+            exercise_id: exercise.exercise_id,
+            exercise_order: exerciseIndex + 1,
+            target_sets: exercise.sets || 3,
+            rest_seconds: exercise.rest_seconds || 60
+          });
+        });
+      });
+
+      // Get routine IDs for cleanup if needed
+      const routineIds = insertedRoutines.map(r => r.id);
+
+      try {
+        // Insert routine_exercises if any exist
+        if (routineExercises.length > 0) {
+          const { error: exercisesError } = await supabase
+            .from('routine_exercises')
+            .insert(routineExercises);
+
+          if (exercisesError) throw exercisesError;
+        }
+
+        // Update trainer_clients with the routine IDs
+        const { error: updateError } = await supabase
+          .from('trainer_clients')
+          .update({
+            assigned_program_id: programId,
+            generated_routine_ids: routineIds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('trainer_id', user.id)
+          .eq('client_id', clientId);
+
+        if (updateError) throw updateError;
+      } catch (err) {
+        // Rollback: delete created routines if downstream operations fail
+        await supabase.from('workout_routines').delete().in('id', routineIds);
+        throw err;
+      }
+
+      alert(`Successfully assigned ${program.name} to client! ${routines.length} workouts created.`);
+      
+      // Clear selection
+      setSelectedClientForProgram(prev => {
+        const updated = { ...prev };
+        delete updated[programId];
+        return updated;
+      });
+
+    } catch (error) {
+      console.error('Error assigning program to client:', error);
+      alert('Failed to assign program. Please try again.');
+    } finally {
+      setAssigningToClient(false);
+    }
+  };
+
 
 
 
@@ -925,7 +1127,28 @@ const ProgramLibrary = () => {
   // Load programs on component mount
   useEffect(() => {
     fetchPrograms();
+    fetchClients();
   }, []);
+
+  // Generate default routines for all programs on initial load
+  useEffect(() => {
+    if (programs.length > 0) {
+      const defaultFrequency = 3;
+      const newRoutines = {};
+      const newFrequencies = {};
+
+      programs.forEach(program => {
+        if (program.exercise_pool && program.exercise_pool.length > 0) {
+          const routines = generateRoutines(program.exercise_pool, defaultFrequency);
+          newRoutines[program.id] = routines;
+          newFrequencies[program.id] = defaultFrequency;
+        }
+      });
+
+      setProgramRoutines(newRoutines);
+      setProgramFrequencies(newFrequencies);
+    }
+  }, [programs]);
 
   const filteredPrograms = getFilteredPrograms();
 
@@ -1008,87 +1231,130 @@ const ProgramLibrary = () => {
                       {getDifficultyDisplay(program.difficulty_level)}
                     </div>
                   </div>
+                  
+                  {/* Edit button */}
+                  <button 
+                    className="program-edit-btn"
+                    onClick={() => setEditingProgram(program)}
+                    title="Edit Program"
+                  >
+                    <Edit size={14} />
+                    Edit Program
+                  </button>
 
                   <p className="program-description">{program.description}</p>
 
                   {/* Exercise List */}
                   {program.routine_count > 0 && (
                     <div className="program-exercises">
-                      <h4>Exercises:</h4>
+                      <h4>Exercises in Pool ({program.routine_count}):</h4>
                       <ul className="exercise-list">
-                        <li>• Barbell Bench Press</li>
-                        <li>• Barbell Squat</li>
-                        <li>• Lat Pulldown</li>
-                        <li>• Bicep Curl</li>
-                        <li>• Triceps Extensions</li>
-                        <li>• Lateral Raises</li>
-                        <li>• Bent Over Rows</li>
-                        <li>• Deadlift</li>
+                        {(program.exercise_pool || []).map((exercise, idx) => (
+                          <li key={idx}>
+                            • {exercise.exercise_name} - {exercise.sets}x{exercise.reps} @ {exercise.rest_seconds}s rest
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}
 
                   <div className="program-actions">
-                    <button className="add-to-client-btn">
-                      Add To Client:
-                    </button>
-                    <button className="client-search-btn">
-                      Client Search
+                    <select 
+                      className="client-search-btn"
+                      value={selectedClientForProgram[program.id] || ''}
+                      onChange={(e) => setSelectedClientForProgram(prev => ({
+                        ...prev,
+                        [program.id]: e.target.value
+                      }))}
+                    >
+                      <option value="">Select Client...</option>
+                      {clients.map(client => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button 
+                      className="add-to-client-btn"
+                      onClick={() => handleAssignToClient(program.id)}
+                      disabled={assigningToClient || !selectedClientForProgram[program.id]}
+                    >
+                      {assigningToClient ? 'Assigning...' : 'Add To Client'}
                     </button>
                   </div>
                 </div>
 
-                {/* Right side - Schedule and Muscle Map */}
+                {/* Right side - Routine Preview */}
                 <div className="program-schedule-section">
+                  {/* Frequency Selector */}
                   <div className="schedule-header">
-                    <label>Days a week:</label>
-                    <select className="days-per-week-selector">
-                      <option value="3">3 days</option>
-                      <option value="4">4 days</option>
-                      <option value="5">5 days</option>
-                      <option value="6">6 days</option>
+                    <label>Training Frequency:</label>
+                    <select 
+                      className="days-per-week-selector"
+                      value={getProgramFrequency(program.id)}
+                      onChange={(e) => handleFrequencyChange(program.id, parseInt(e.target.value))}
+                    >
+                      <option value="2">2 days/week</option>
+                      <option value="3">3 days/week</option>
+                      <option value="4">4 days/week</option>
+                      <option value="5">5 days/week</option>
+                      <option value="6">6 days/week</option>
                     </select>
                   </div>
 
-                  {/* Day Schedule */}
-                  <div className="day-schedule">
-                    <div className="day-item">
-                      <div className="day-label">Day 1</div>
-                      <div className="day-routine">
-                        <span className="routine-name">Legs & Shoulders</span>
+                  {/* Muscle Map Preview - Shows coverage gaps */}
+                  <div className="muscle-map-section">
+                    <div className="muscle-map-container">
+                      <div className="muscle-map-front">
+                        <AnatomicalMuscleMap
+                          highlightedMuscles={program.target_muscle_groups || []}
+                          variant="front"
+                          className="muscle-map-compact"
+                        />
                       </div>
-                      <div className="muscle-map-small">
-                        <ProgramMuscleMap
-                          program={program}
-                          routines={programRoutines[program.id] || []}
+                      <div className="muscle-map-back">
+                        <AnatomicalMuscleMap
+                          highlightedMuscles={program.target_muscle_groups || []}
+                          variant="back"
+                          className="muscle-map-compact"
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="day-item">
-                      <div className="day-label">Day 2</div>
-                      <div className="day-routine">
-                        <span className="routine-name">Back & Biceps</span>
-                      </div>
-                      <div className="muscle-map-small">
-                        <ProgramMuscleMap
-                          program={program}
-                          routines={programRoutines[program.id] || []}
-                        />
+                  {/* Generated Routines Preview */}
+                  {getProgramRoutines(program.id).length > 0 && (
+                    <div className="routine-preview">
+                      <div className="routine-grid">
+                        {getProgramRoutines(program.id).map((routine, idx) => (
+                          <div key={idx} className="routine-card-mini">
+                            <div className="routine-header-mini">
+                              <span className="routine-day">Day {idx + 1}</span>
+                              <span className="routine-name-mini">{routine.name}</span>
+                            </div>
+                            <div className="routine-stats-mini">
+                              <span>{routine.exercises.length} ex</span>
+                              <span>{routine.total_sets} sets</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
+                  )}
 
-                    <div className="day-item">
-                      <div className="day-label">Day 3</div>
-                      <div className="day-routine">
-                        <span className="routine-name">Chest & Triceps</span>
-                      </div>
-                      <div className="muscle-map-small">
-                        <ProgramMuscleMap
-                          program={program}
-                          routines={programRoutines[program.id] || []}
-                        />
-                      </div>
+                  {/* Program Stats */}
+                  <div className="program-stats">
+                    <div className="stat-item">
+                      <span className="stat-label">Duration:</span>
+                      <span className="stat-value">{program.estimated_weeks || 'N/A'} weeks</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Type:</span>
+                      <span className="stat-value">{program.program_type}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Total Exercises:</span>
+                      <span className="stat-value">{program.routine_count}</span>
                     </div>
                   </div>
 
@@ -1114,6 +1380,28 @@ const ProgramLibrary = () => {
           program={selectedProgram}
           user={user}
           onClose={() => setSelectedProgram(null)}
+        />
+      )}
+
+      {/* Program Editor Modal */}
+      {editingProgram && (
+        <ProgramEditorModal
+          program={editingProgram}
+          onClose={() => setEditingProgram(null)}
+          onSave={async (updatedProgram) => {
+            // Update the programs state
+            setPrograms(prevPrograms => 
+              prevPrograms.map(p => 
+                p.id === updatedProgram.id ? { ...p, ...updatedProgram } : p
+              )
+            );
+            
+            // Refresh the program from database to get full data
+            await fetchPrograms();
+            
+            // Close the modal
+            setEditingProgram(null);
+          }}
         />
       )}
     </div>

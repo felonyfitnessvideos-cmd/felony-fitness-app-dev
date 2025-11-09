@@ -1,0 +1,28 @@
+/**
+ * Anatomical Muscle Map Styles
+ * Styling for the professional muscle map visualization
+ */
+
+.anatomical-muscle-map {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Override library styles for compact display */
+.anatomical-muscle-map svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ensure proper sizing in compact mode */
+.muscle-map-compact .anatomical-muscle-map {
+  max-width: 80px;
+}
+
+/* Hide any default labels from the library */
+.anatomical-muscle-map text {
+  display: none;
+}
