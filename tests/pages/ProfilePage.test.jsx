@@ -65,7 +65,9 @@ vi.mock('lucide-react', () => ({
   Weight: () => <div data-testid="weight-icon">Weight Icon</div>,
   Activity: () => <div data-testid="activity-icon">Activity Icon</div>,
   Percent: () => <div data-testid="percent-icon">Percent Icon</div>,
-  X: () => <div data-testid="x-icon">X Icon</div>
+  X: () => <div data-testid="x-icon">X Icon</div>,
+  Phone: () => <div data-testid="phone-icon">Phone Icon</div>,
+  MapPin: () => <div data-testid="map-pin-icon">MapPin Icon</div>
 }));
 
 // Mock SubPageHeader component
